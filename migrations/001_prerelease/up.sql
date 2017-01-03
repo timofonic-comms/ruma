@@ -93,3 +93,27 @@ CREATE TABLE filters (
     content TEXT NOT NULL,
     UNIQUE (id, user_id)
 );
+
+CREATE TABLE presence_status (
+    id TEXT NOT NULL PRIMARY KEY,
+    event_id TEXT NOT NULL,
+    presence TEXT NOT NULL,
+    status_msg TEXT,
+    updated_at TIMESTAMP NOT NULL DEFAULT now(),
+    UNIQUE (id)
+);
+
+CREATE TABLE  presence_list (
+    user_id TEXT NOT NULL,
+    observed_user_id TEXT NOT NULL,
+    UNIQUE (user_id, observed_user_id)
+);
+
+CREATE TABLE presence_stream (
+    ordering BIGSERIAL NOT NULL,
+    event_id TEXT NOT NULL PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    presence TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    UNIQUE (event_id)
+);

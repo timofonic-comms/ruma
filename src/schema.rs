@@ -114,3 +114,30 @@ table! {
         content -> Text,
     }
 }
+
+table! {
+    presence_status {
+        id -> Text,
+        event_id -> Text,
+        presence -> Text,
+        status_msg -> Nullable<Text>,
+        updated_at -> Timestamp,
+    }
+}
+
+table! {
+    presence_list(user_id, observed_user_id) {
+        user_id -> Text,
+        observed_user_id -> Text,
+    }
+}
+
+table! {
+    presence_stream(event_id) {
+        ordering -> BigSerial,
+        event_id -> Text,
+        user_id -> Text,
+        presence -> Text,
+        created_at -> Timestamp,
+    }
+}
