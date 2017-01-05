@@ -218,8 +218,8 @@ impl Sync {
         let room_memberships = RoomMembership::find_by_user_id_order_by_room_id(connection, &user.id)?;
 
         let since = match *context {
-            Context::Incremental(batch) | Context::FullState(batch)  => batch.room_key,
-            Context::Initial => -1,
+            Context::Incremental(batch) => batch.room_key,
+            Context::FullState(_) | Context::Initial => -1,
         };
         let timeline_filter = match room_filter {
             Some(filter) => filter.timeline,
