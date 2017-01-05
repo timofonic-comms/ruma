@@ -22,8 +22,8 @@ use error::ApiError;
 use models::event::Event;
 use models::filter::{ContentFilter, RoomEventFilter, RoomFilter};
 use models::room_membership::RoomMembership;
-use models::presence_status::PresenceStatus;
 use models::presence_list::PresenceList;
+use models::presence_status::PresenceStatus;
 use models::user::User;
 
 #[derive(Debug, Clone, Serialize)]
@@ -185,12 +185,14 @@ impl Sync {
         Ok(state)
     }
 
+    /// Return presence events for sync from database and options.
     fn get_presence_events(
         connection: &PgConnection,
         homeserver_domain: &str,
         user: &User,
         set_presence: Option<PresenceState>,
-        context: &Context) -> Result<(i64, Vec<PresenceEvent>), ApiError> {
+        context: &Context
+    ) -> Result<(i64, Vec<PresenceEvent>), ApiError> {
         if let Some(set_presence) = set_presence {
             PresenceStatus::upsert(connection, homeserver_domain, &user.id, set_presence, None)?;
         }
@@ -200,7 +202,7 @@ impl Sync {
             Context::Initial => None,
         };
 
-        PresenceList::find_events(connection, &user.id, since)
+        PresenceList::find_events_by_uid(connection, &user.id, since)
     }
 
     /// Return rooms for sync from database and options.
@@ -281,7 +283,10 @@ impl Sync {
     }
 
     /// Converting events in the correct format for timeline.
-    fn convert_events_to_timeline(events: Vec<Event>, timeline_filter: &Option<RoomEventFilter>) -> Result<(i64, Timeline), ApiError> {
+    fn convert_events_to_timeline(
+        events: Vec<Event>,
+        timeline_filter: &Option<RoomEventFilter>
+    ) -> Result<(i64, Timeline), ApiError> {
         let mut room_ordering = 0;
         let mut timeline_events = Vec::new();
         let mut limited = false;

@@ -14,8 +14,8 @@ use db::DB;
 use error::ApiError;
 use middleware::{AccessTokenAuth, JsonRequest, MiddlewareChain, UserIdParam};
 use modifier::SerializableResponse;
-use models::presence_status::PresenceStatus;
 use models::presence_list::PresenceList;
+use models::presence_status::PresenceStatus;
 use models::user::User;
 
 /// The PUT `/presence/:user_id/status` endpoint.
@@ -23,7 +23,9 @@ pub struct PutPresenceStatus;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct PutPresenceStatusRequest {
+    /// The status message to attach to this state.
     status_msg: Option<String>,
+    /// The new presence state. One of: ["online", "offline", "unavailable"]
     presence: PresenceState,
 }
 
@@ -37,7 +39,7 @@ impl Handler for PutPresenceStatus {
         let user = request.extensions.get::<User>()
             .expect("AccessTokenAuth should ensure a user").clone();
 
-        let put_presence_status_request: PutPresenceStatusRequest = match request.get::<bodyparser::Struct<PutPresenceStatusRequest>>() {
+        let put_presence_status_request = match request.get::<bodyparser::Struct<PutPresenceStatusRequest>>() {
             Ok(Some(request)) => request,
             Ok(None) | Err(_) => {
                 return Err(IronError::from(ApiError::bad_json(None)));
@@ -54,7 +56,13 @@ impl Handler for PutPresenceStatus {
             return Err(IronError::from(error));
         }
 
-        PresenceStatus::upsert(&connection, &config.domain, &user_id, put_presence_status_request.presence, put_presence_status_request.status_msg)?;
+        PresenceStatus::upsert(
+            &connection,
+            &config.domain,
+            &user_id,
+            put_presence_status_request.presence,
+            put_presence_status_request.status_msg
+        )?;
 
         Ok(Response::with(Status::Ok))
     }
@@ -62,10 +70,14 @@ impl Handler for PutPresenceStatus {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct GetPresenceStatusResponse {
+    /// The state message for this user if one was set.
     #[serde(skip_serializing_if = "Option::is_none")]
     status_msg: Option<String>,
+    /// Whether the user is currently active.
     currently_active: bool,
+    /// The length of time in milliseconds since an action was performed by this user.
     last_active_ago: u64,
+    /// This user's presence. One of: ["online", "offline", "unavailable"]
     presence: PresenceState,
 }
 
@@ -81,19 +93,21 @@ impl Handler for GetPresenceStatus {
 
         let connection = DB::from_request(request)?;
 
-        let event = PresenceStatus::find(&connection, &user_id)?;
-        let event: PresenceStatus = match event {
+        let status = PresenceStatus::find_by_uid(&connection, &user_id)?;
+        let status: PresenceStatus = match status {
             Some(event) => event,
-            None => return Err(IronError::from(ApiError::not_found("The given user_id does not correspond to an presence status".to_string()))),
+            None => return Err(IronError::from(
+                ApiError::not_found("The given user_id does not correspond to an presence status".to_string())
+            )),
         };
 
-        let presence_state: PresenceState = from_value(Value::String(event.presence)).map_err(ApiError::from)?;
+        let presence_state: PresenceState = from_value(Value::String(status.presence)).map_err(ApiError::from)?;
         let now = SystemTime::now();
-        let last_active_ago = PresenceStatus::calculate_last_active_ago(event.updated_at, now)?;
+        let last_active_ago = PresenceStatus::calculate_last_active_ago(status.updated_at, now)?;
         let currently_active = last_active_ago < (5 * 60 * 1000) && presence_state == PresenceState::Online;
 
         let event = GetPresenceStatusResponse {
-            status_msg: event.status_msg,
+            status_msg: status.status_msg,
             currently_active: currently_active,
             last_active_ago: last_active_ago,
             presence: presence_state,
@@ -108,7 +122,9 @@ pub struct PostPresenceList;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct PostPresenceListRequest {
+    /// A list of user IDs to remove from the list.
     invite: Vec<UserId>,
+    /// A list of user IDs to add to the list.
     drop: Vec<UserId>,
 }
 
@@ -116,7 +132,7 @@ middleware_chain!(PostPresenceList, [JsonRequest, UserIdParam, AccessTokenAuth])
 
 impl Handler for PostPresenceList {
     fn handle(&self, request: &mut Request) -> IronResult<Response> {
-        let put_presence_list_request: PostPresenceListRequest = match request.get::<bodyparser::Struct<PostPresenceListRequest>>() {
+        let put_presence_list_request = match request.get::<bodyparser::Struct<PostPresenceListRequest>>() {
             Ok(Some(request)) => request,
             Ok(None) | Err(_) => {
                 return Err(IronError::from(ApiError::bad_json(None)));
@@ -138,7 +154,12 @@ impl Handler for PostPresenceList {
             return Err(IronError::from(error));
         }
 
-        PresenceList::create_or_delete(&connection, &user_id, &put_presence_list_request.invite, put_presence_list_request.drop)?;
+        PresenceList::update(
+            &connection,
+            &user_id,
+            &put_presence_list_request.invite,
+            put_presence_list_request.drop
+        )?;
 
         Ok(Response::with(Status::Ok))
     }
@@ -156,7 +177,7 @@ impl Handler for GetPresenceList {
 
         let connection = DB::from_request(request)?;
 
-        let (_, events) = PresenceList::find_events(&connection, &user_id, None)?;
+        let (_, events) = PresenceList::find_events_by_uid(&connection, &user_id, None)?;
 
         Ok(Response::with((Status::Ok, SerializableResponse(events))))
     }

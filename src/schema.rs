@@ -133,7 +133,7 @@ table! {
 }
 
 table! {
-    presence_stream(event_id) {
+    presence_events(event_id) {
         ordering -> BigSerial,
         event_id -> Text,
         user_id -> Text,

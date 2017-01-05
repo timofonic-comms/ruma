@@ -10,11 +10,9 @@ use diesel::{
     ExpressionMethods,
     ExecuteDsl,
     FilterDsl,
-    GroupByDsl,
     LoadDsl,
-    SelectDsl,
 };
-use diesel::expression::dsl::{any, max};
+use diesel::expression::dsl::any;
 use diesel::pg::PgConnection;
 use ruma_events::EventType;
 use ruma_events::presence::{PresenceEvent, PresenceEventContent, PresenceState};
@@ -23,10 +21,10 @@ use serde_json::{from_value, Value};
 
 use error::ApiError;
 use models::presence_status::PresenceStatus;
-use models::presence_stream::PresenceStreamEvent;
+use models::presence_event::PresenceStreamEvent;
 use models::profile::Profile;
 use models::user::User;
-use schema::{presence_list, presence_stream, profiles, users};
+use schema::{presence_list, users};
 
 /// A Matrix presence list.
 #[derive(Debug, Clone, Insertable, Queryable)]
@@ -40,8 +38,12 @@ pub struct PresenceList {
 
 impl PresenceList {
     /// Combines creations and deletions of multiple presence list entries.
-    pub fn create_or_delete(connection: &PgConnection, user_id: &UserId, invite: &Vec<UserId>, drop: Vec<UserId>)
-                            -> Result<(), ApiError> {
+    pub fn update(
+        connection: &PgConnection,
+        user_id: &UserId,
+        invite: &Vec<UserId>,
+        drop: Vec<UserId>
+    ) -> Result<(), ApiError> {
         connection.transaction::<(()), ApiError, _>(|| {
             let users: Vec<User> = users::table
                         .filter(users::id.eq(any(invite)))
@@ -73,38 +75,23 @@ impl PresenceList {
     }
 
     /// Return `PresenceEvent`'s for given `UserId`.
-    pub fn find_events(connection: &PgConnection, user_id: &UserId, since: Option<i64>)
-        -> Result<(i64, Vec<PresenceEvent>), ApiError> {
+    pub fn find_events_by_uid(
+        connection: &PgConnection,
+        user_id: &UserId,
+        since: Option<i64>
+    ) -> Result<(i64, Vec<PresenceEvent>), ApiError> {
         let mut max_ordering = -1;
 
-        let users = presence_list::table
-            .filter(presence_list::user_id.eq(user_id))
-            .select(presence_list::observed_user_id);
-        let stream_events: Vec<PresenceStreamEvent> = if let Some(since) = since {
-            let ordering = presence_stream::table
-                .filter(presence_stream::user_id.eq(any(&users)))
-                .filter(presence_stream::ordering.gt(since))
-                .group_by(presence_stream::user_id)
-                .select(max(presence_stream::ordering));
-            presence_stream::table
-                .filter(presence_stream::ordering.eq(any(&ordering)))
-                .get_results(connection)
-                .map_err(ApiError::from)?
-        } else {
-            let ordering = presence_stream::table
-                .filter(presence_stream::user_id.eq(any(&users)))
-                .group_by(presence_stream::user_id)
-                .select(max(presence_stream::ordering));
-            presence_stream::table
-                .filter(presence_stream::ordering.eq(any(&ordering)))
-                .get_results(connection)
-                .map_err(ApiError::from)?
-        };
+        let stream_events= PresenceStreamEvent::find_for_presence_list_by_uid(
+            connection,
+            user_id,
+            since
+        )?;
 
-        let profiles: Vec<Profile> = profiles::table
-            .filter(profiles::id.eq(any(&users)))
-            .get_results(connection)
-            .map_err(ApiError::from)?;
+        let profiles = Profile::find_for_presence_list_by_uid(
+            connection,
+            user_id
+        )?;
 
         let mut events = Vec::new();
         let now = SystemTime::now();

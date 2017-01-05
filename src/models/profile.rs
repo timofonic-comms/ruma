@@ -1,18 +1,22 @@
 //! Matrix profile.
 
 use diesel::{
-    LoadDsl,
-    FindDsl,
-    SaveChangesDsl,
     insert,
+    ExpressionMethods,
+    FilterDsl,
+    FindDsl,
+    LoadDsl,
+    SaveChangesDsl,
+    SelectDsl,
 };
+use diesel::expression::dsl::any;
 use diesel::pg::PgConnection;
 use diesel::result::Error as DieselError;
 use ruma_identifiers::UserId;
 
 use error::ApiError;
 use models::room_membership::{RoomMembership, RoomMembershipOptions};
-use schema::profiles;
+use schema::{profiles, presence_list};
 
 /// A Matrix profile.
 #[derive(AsChangeset, Debug, Clone, Identifiable, Insertable, Queryable)]
@@ -125,5 +129,18 @@ impl Profile {
             Err(DieselError::NotFound) => Ok(None),
             Err(err) => Err(ApiError::from(err)),
         }
+    }
+
+    pub fn find_for_presence_list_by_uid(
+        connection: &PgConnection,
+        user_id: &UserId,
+    ) -> Result<Vec<Profile>, ApiError> {
+        let users = presence_list::table
+            .filter(presence_list::user_id.eq(user_id))
+            .select(presence_list::observed_user_id);
+        profiles::table
+            .filter(profiles::id.eq(any(users)))
+            .get_results(connection)
+            .map_err(ApiError::from)
     }
 }

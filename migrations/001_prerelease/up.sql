@@ -95,25 +95,24 @@ CREATE TABLE filters (
 );
 
 CREATE TABLE presence_status (
-    id TEXT NOT NULL PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     event_id TEXT NOT NULL,
     presence TEXT NOT NULL,
     status_msg TEXT,
-    updated_at TIMESTAMP NOT NULL DEFAULT now(),
-    UNIQUE (id)
+    updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
 CREATE TABLE  presence_list (
     user_id TEXT NOT NULL,
     observed_user_id TEXT NOT NULL,
-    UNIQUE (user_id, observed_user_id)
+    PRIMARY KEY (user_id, observed_user_id)
 );
 
-CREATE TABLE presence_stream (
+CREATE TABLE presence_events (
     ordering BIGSERIAL NOT NULL,
-    event_id TEXT NOT NULL PRIMARY KEY,
+    event_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     presence TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT now(),
-    UNIQUE (event_id)
+    UNIQUE (ordering)
 );

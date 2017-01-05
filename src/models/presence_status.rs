@@ -1,8 +1,8 @@
 //! Storage and querying of presence status.
 
-use std::time::SystemTime;
 #[cfg(test)]
 use std::time::Duration;
+use std::time::SystemTime;
 
 use diesel::{
     insert,
@@ -19,7 +19,7 @@ use ruma_events::presence::PresenceState;
 use ruma_identifiers::{UserId, EventId};
 
 use error::ApiError;
-use models::presence_stream::PresenceStreamEvent;
+use models::presence_event::PresenceStreamEvent;
 use schema::presence_status;
 
 /// A Matrix presence status, not saved yet.
@@ -72,7 +72,7 @@ impl PresenceStatus {
         let event_id = &EventId::new(&homeserver_domain).map_err(ApiError::from)?;
         let presence = &to_string(presence);
         connection.transaction::<(), ApiError, _>(|| {
-            let status = PresenceStatus::find(connection, user_id)?;
+            let status = PresenceStatus::find_by_uid(connection, user_id)?;
             PresenceStreamEvent::insert(connection, event_id, user_id, presence)?;
             match status {
                 Some(mut status) => status.update(connection, presence, status_msg, event_id),
@@ -122,8 +122,8 @@ impl PresenceStatus {
     }
 
     /// Return `PresenceStatus` for given `UserId`.
-    pub fn find(connection: &PgConnection, user_id: &UserId)
-        -> Result<Option<PresenceStatus>, ApiError> {
+    pub fn find_by_uid(connection: &PgConnection, user_id: &UserId)
+                       -> Result<Option<PresenceStatus>, ApiError> {
         let status = presence_status::table
             .filter(presence_status::id.eq(user_id))
             .first(connection);
