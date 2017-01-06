@@ -16,7 +16,6 @@ use diesel::pg::PgConnection;
 use ruma_events::EventType;
 use ruma_events::presence::{PresenceEvent, PresenceEventContent, PresenceState};
 use ruma_identifiers::UserId;
-use serde_json::{from_value, Value};
 
 use error::ApiError;
 use models::presence_status::PresenceStatus;
@@ -81,7 +80,8 @@ impl PresenceList {
     pub fn find_events_by_uid(
         connection: &PgConnection,
         user_id: &UserId,
-        since: Option<i64>
+        since: Option<i64>,
+        timeout: u64
     ) -> Result<(i64, Vec<PresenceEvent>), ApiError> {
         let mut max_ordering = -1;
 
@@ -109,14 +109,16 @@ impl PresenceList {
                 displayname = profile.displayname.clone();
             }
 
-            let presence_state: PresenceState = from_value(Value::String(stream_event.presence)).map_err(ApiError::from)?;
+            let mut presence_state: PresenceState = stream_event.presence.parse().expect("Something wrong with the database!");
             let last_active_ago = PresenceStatus::calculate_last_active_ago(stream_event.created_at, now)?;
-            let currently_active = last_active_ago < (5 * 60 * 1000) && presence_state == PresenceState::Online;
+            if last_active_ago > timeout && presence_state == PresenceState::Online {
+                presence_state = PresenceState::Unavailable;
+            }
 
             events.push(PresenceEvent {
                 content: PresenceEventContent {
                     avatar_url: avatar_url,
-                    currently_active: currently_active,
+                    currently_active: true,
                     displayname: displayname,
                     last_active_ago: Some(last_active_ago),
                     presence: presence_state,

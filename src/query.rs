@@ -157,6 +157,7 @@ impl Sync {
         homeserver_domain: &str,
         user: &User,
         options: SyncOptions,
+        update_interval_presence: u64,
     ) -> Result<Sync, ApiError> {
         let mut context = Context::Initial;
         if let Some(ref batch) = options.since {
@@ -171,7 +172,14 @@ impl Sync {
             Some(filter) => filter.room,
             None => None
         };
-        let (presence_key, presence) = Sync::get_presence_events(connection, homeserver_domain, user, options.set_presence, &context)?;
+        let (presence_key, presence) = Sync::get_presence_events(
+            connection,
+            homeserver_domain,
+            user,
+            options.set_presence,
+            update_interval_presence,
+            &context
+        )?;
 
         let (room_key, rooms) = Sync::get_rooms_events(connection, user, filter_room, &context)?;
         let batch = Batch::new(room_key, presence_key);
@@ -191,6 +199,7 @@ impl Sync {
         homeserver_domain: &str,
         user: &User,
         set_presence: Option<PresenceState>,
+        update_interval_presence: u64,
         context: &Context
     ) -> Result<(i64, Vec<PresenceEvent>), ApiError> {
         if let Some(set_presence) = set_presence {
@@ -202,7 +211,12 @@ impl Sync {
             Context::Initial => None,
         };
 
-        PresenceList::find_events_by_uid(connection, &user.id, since)
+        PresenceList::find_events_by_uid(
+            connection,
+            &user.id,
+            since,
+            update_interval_presence
+        )
     }
 
     /// Return rooms for sync from database and options.

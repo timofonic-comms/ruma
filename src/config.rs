@@ -25,6 +25,13 @@ struct RawConfig {
     domain: String,
     macaroon_secret_key: String,
     postgres_url: String,
+    #[serde(default = "default_update_interval_presence")]
+    update_interval_presence: u64,
+}
+
+/// Return the default value for update_interval_presence
+fn default_update_interval_presence() -> u64 {
+    300000
 }
 
 /// Server configuration provided by the user.
@@ -44,6 +51,8 @@ pub struct Config {
     /// A [PostgreSQL connection string](http://www.postgresql.org/docs/current/static/libpq-connect.html#LIBPQ-CONNSTRING)
     /// for Ruma's PostgreSQL database.
     pub postgres_url: String,
+    /// Interval after a user is set as unavailable in milliseconds. Defaults to 300000.
+    pub update_interval_presence: u64,
 }
 
 impl Config {
@@ -75,6 +84,7 @@ impl Config {
             domain: config.domain,
             macaroon_secret_key: macaroon_secret_key,
             postgres_url: config.postgres_url,
+            update_interval_presence: config.update_interval_presence,
         })
     }
 

@@ -1,13 +1,10 @@
 //! Endpoints for presence.
 
-use std::time::SystemTime;
-
 use bodyparser;
 use iron::status::Status;
 use iron::{Chain, Handler, IronResult, IronError, Plugin, Request, Response};
 use ruma_identifiers::{UserId};
 use ruma_events::presence::PresenceState;
-use serde_json::{from_value, Value};
 
 use config::Config;
 use db::DB;
@@ -68,19 +65,6 @@ impl Handler for PutPresenceStatus {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct GetPresenceStatusResponse {
-    /// The state message for this user if one was set.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    status_msg: Option<String>,
-    /// Whether the user is currently active.
-    currently_active: bool,
-    /// The length of time in milliseconds since an action was performed by this user.
-    last_active_ago: u64,
-    /// This user's presence. One of: ["online", "offline", "unavailable"]
-    presence: PresenceState,
-}
-
 /// The GET `/presence/:user_id/status` endpoint.
 pub struct GetPresenceStatus;
 
@@ -92,28 +76,15 @@ impl Handler for GetPresenceStatus {
             .expect("UserIdParam should ensure a UserId").clone();
 
         let connection = DB::from_request(request)?;
+        let config = Config::from_request(request)?;
 
-        let status = PresenceStatus::find_by_uid(&connection, &user_id)?;
-        let status: PresenceStatus = match status {
-            Some(event) => event,
-            None => return Err(IronError::from(
-                ApiError::not_found("The given user_id does not correspond to an presence status".to_string())
-            )),
-        };
+        let response = PresenceStatus::find_by_uid_and_convert_as_response(
+            &connection,
+            user_id,
+            config.update_interval_presence
+        )?;
 
-        let presence_state: PresenceState = from_value(Value::String(status.presence)).map_err(ApiError::from)?;
-        let now = SystemTime::now();
-        let last_active_ago = PresenceStatus::calculate_last_active_ago(status.updated_at, now)?;
-        let currently_active = last_active_ago < (5 * 60 * 1000) && presence_state == PresenceState::Online;
-
-        let event = GetPresenceStatusResponse {
-            status_msg: status.status_msg,
-            currently_active: currently_active,
-            last_active_ago: last_active_ago,
-            presence: presence_state,
-        };
-
-        Ok(Response::with((Status::Ok, SerializableResponse(event))))
+        Ok(Response::with((Status::Ok, SerializableResponse(response))))
     }
 }
 
@@ -176,8 +147,14 @@ impl Handler for GetPresenceList {
             .expect("UserIdParam should ensure a UserId").clone();
 
         let connection = DB::from_request(request)?;
+        let config = Config::from_request(request)?;
 
-        let (_, events) = PresenceList::find_events_by_uid(&connection, &user_id, None)?;
+        let (_, events) = PresenceList::find_events_by_uid(
+            &connection,
+            &user_id,
+            None,
+            config.update_interval_presence
+        )?;
 
         Ok(Response::with((Status::Ok, SerializableResponse(events))))
     }
@@ -297,8 +274,14 @@ mod tests {
         );
         let response = test.get(&presence_list_path);
         assert_eq!(response.status, Status::Ok);
-        let array = response.json().as_array().unwrap();
-        assert_eq!(array.len(), 2);
+        let events = response.json().as_array().unwrap();
+        println!("{:#?}", events);
+        let mut events = events.into_iter();
+        assert_eq!(events.len(), 2);
+        let event = events.next().unwrap();
+        assert_eq!(event.find_path(&["content", "user_id"]).unwrap().as_str().unwrap(), bob_id);
+        let event = events.next().unwrap();
+        assert_eq!(event.find_path(&["content", "user_id"]).unwrap().as_str().unwrap(), carl_id);
     }
 
     #[test]
