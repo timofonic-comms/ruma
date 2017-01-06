@@ -1,6 +1,5 @@
 //! Matrix room membership.
 
-use std::collections::HashSet;
 use std::convert::TryInto;
 use std::error::Error;
 use std::iter::FromIterator;
@@ -37,7 +36,7 @@ use models::event::{NewEvent, Event};
 use models::user::User;
 use models::profile::Profile;
 use models::room::Room;
-use schema::{events, users, room_memberships};
+use schema::{events, room_memberships};
 
 /// Room membership update or create data.
 #[derive(Debug, Clone)]
@@ -313,11 +312,9 @@ impl RoomMembership {
     pub fn create_memberships(
         connection: &PgConnection,
         room: &Room,
-        invite_list: Vec<UserId>,
+        invite_list: &Vec<UserId>,
         homeserver_domain: &str
     ) -> Result<(), ApiError> {
-        let user_ids = HashSet::from_iter(invite_list.clone());
-
         for invitee in invite_list {
             if invitee.hostname().to_string() != homeserver_domain {
                 return Err(
@@ -325,41 +322,12 @@ impl RoomMembership {
                 );
             }
         }
+        let options = user_ids.iter().map(|user_id| {
 
-        let users: Vec<User> = users::table
-            .filter(users::id.eq(any(
-                user_ids.iter().cloned().collect::<Vec<UserId>>()))
-            )
-            .get_results(connection)
-            .map_err(ApiError::from)?;
-
-        let loaded_user_ids: HashSet<UserId> = users
-            .iter()
-            .map(|user| user.id.clone())
-            .collect();
-
-        let missing_user_ids: Vec<UserId> = user_ids
-            .difference(&loaded_user_ids)
-            .cloned()
-            .collect();
-
-        if !missing_user_ids.is_empty() {
-            return Err(
-                ApiError::bad_json(format!(
-                    "Unknown users in invite list: {}",
-                    &missing_user_ids
-                        .iter()
-                        .map(|user_id| user_id.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                ))
-            )
-        }
-
-        let options = users.iter().map(|user| {
+        let user_ids = User::find_missing_user_and_check_existence(connection, invite_list)?;
             RoomMembershipOptions {
                 room_id: room.id.clone(),
-                user_id: user.id.clone(),
+                user_id: user_id.clone(),
                 sender: room.user_id.clone(),
                 membership: "invite".to_string(),
             }

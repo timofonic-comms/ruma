@@ -27,7 +27,7 @@ use schema::presence_status;
 #[table_name = "presence_status"]
 pub struct NewPresenceStatus {
     /// The user's ID.
-    pub id: UserId,
+    pub user_id: UserId,
     /// The unique event ID.
     pub event_id: EventId,
     /// The current presence state.
@@ -39,9 +39,10 @@ pub struct NewPresenceStatus {
 /// A Matrix presence status.
 #[derive(Debug, Clone, Queryable, Identifiable, AsChangeset)]
 #[table_name = "presence_status"]
+#[primary_key(user_id)]
 pub struct PresenceStatus {
     /// The user's ID.
-    pub id: UserId,
+    pub user_id: UserId,
     /// The unique event ID.
     pub event_id: EventId,
     /// The current presence state.
@@ -50,14 +51,6 @@ pub struct PresenceStatus {
     pub status_msg: Option<String>,
     /// Timestamp of the last update.
     pub updated_at: SystemTime,
-}
-
-fn to_string(state: PresenceState) -> String {
-    match state {
-        PresenceState::Offline => "offline",
-        PresenceState::Online => "online",
-        PresenceState::Unavailable => "unavailable",
-    }.to_string()
 }
 
 impl PresenceStatus {
@@ -70,7 +63,6 @@ impl PresenceStatus {
         status_msg: Option<String>
     ) -> Result<(), ApiError> {
         let event_id = &EventId::new(&homeserver_domain).map_err(ApiError::from)?;
-        let presence = &to_string(presence);
         connection.transaction::<(), ApiError, _>(|| {
             let status = PresenceStatus::find_by_uid(connection, user_id)?;
             PresenceStreamEvent::insert(connection, event_id, user_id, presence)?;
@@ -85,11 +77,11 @@ impl PresenceStatus {
     fn update(
         &mut self,
         connection: &PgConnection,
-        presence: &String,
+        presence: PresenceState,
         status_msg: Option<String>,
         event_id: &EventId
     ) -> Result<(), ApiError> {
-        self.presence = presence.clone();
+        self.presence = presence.to_string();
         self.status_msg = status_msg;
         self.event_id = event_id.clone();
         self.updated_at = SystemTime::now();
@@ -104,14 +96,14 @@ impl PresenceStatus {
     fn create(
         connection: &PgConnection,
         user_id: &UserId,
-        presence: &String,
+        presence: PresenceState,
         status_msg: Option<String>,
         event_id: &EventId
     ) -> Result<(), ApiError> {
         let new_status = NewPresenceStatus {
-            id: user_id.clone(),
+            user_id: user_id.clone(),
             event_id: event_id.clone(),
-            presence: presence.clone(),
+            presence: presence.to_string(),
             status_msg: status_msg,
         };
         insert(&new_status)
@@ -125,7 +117,7 @@ impl PresenceStatus {
     pub fn find_by_uid(connection: &PgConnection, user_id: &UserId)
                        -> Result<Option<PresenceStatus>, ApiError> {
         let status = presence_status::table
-            .filter(presence_status::id.eq(user_id))
+            .filter(presence_status::user_id.eq(user_id))
             .first(connection);
 
         match status{

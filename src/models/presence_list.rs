@@ -10,7 +10,6 @@ use diesel::{
     ExpressionMethods,
     ExecuteDsl,
     FilterDsl,
-    LoadDsl,
 };
 use diesel::expression::dsl::any;
 use diesel::pg::PgConnection;
@@ -24,7 +23,7 @@ use models::presence_status::PresenceStatus;
 use models::presence_event::PresenceStreamEvent;
 use models::profile::Profile;
 use models::user::User;
-use schema::{presence_list, users};
+use schema::presence_list;
 
 /// A Matrix presence list.
 #[derive(Debug, Clone, Insertable, Queryable)]
@@ -45,13 +44,12 @@ impl PresenceList {
         drop: Vec<UserId>
     ) -> Result<(), ApiError> {
         connection.transaction::<(()), ApiError, _>(|| {
-            let users: Vec<User> = users::table
-                        .filter(users::id.eq(any(invite)))
-                        .get_results(connection)
-                        .map_err(ApiError::from)?;
-            if users.len() != invite.len() {
-                return Err(ApiError::invalid_param("invite", "Users does not exists!"));
-            }
+
+            let invite = User::find_missing_user_and_check_existence(
+                connection,
+                invite
+            )?;
+
             let mut invites: Vec<PresenceList> = Vec::new();
             for observed_user in invite.clone() {
                 invites.push(PresenceList {
@@ -63,6 +61,11 @@ impl PresenceList {
                 .into(presence_list::table)
                 .execute(connection)
                 .map_err(ApiError::from)?;
+
+            let drop = User::find_missing_user_and_check_existence(
+                connection,
+                &drop
+            )?;
 
             let drop = presence_list::table
                 .filter(presence_list::user_id.eq(user_id))

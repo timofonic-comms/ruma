@@ -12,6 +12,7 @@ use diesel::{
 };
 use diesel::expression::dsl::{any, max};
 use diesel::pg::PgConnection;
+use ruma_events::presence::PresenceState;
 use ruma_identifiers::{EventId, UserId};
 
 use error::ApiError;
@@ -51,12 +52,12 @@ impl PresenceStreamEvent {
         connection: &PgConnection,
         event_id: &EventId,
         user_id: &UserId,
-        presence: &String
+        presence: PresenceState
     ) -> Result<PresenceStreamEvent, ApiError> {
         let new_event = NewPresenceStreamEvent {
             event_id: event_id.clone(),
             user_id: user_id.clone(),
-            presence: presence.clone()
+            presence: presence.to_string()
         };
         insert(&new_event)
             .into(presence_events::table)

@@ -95,7 +95,7 @@ CREATE TABLE filters (
 );
 
 CREATE TABLE presence_status (
-    id TEXT PRIMARY KEY,
+    user_id TEXT PRIMARY KEY,
     event_id TEXT NOT NULL,
     presence TEXT NOT NULL,
     status_msg TEXT,

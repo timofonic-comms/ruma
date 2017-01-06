@@ -312,7 +312,7 @@ mod tests {
             access_token
         );
         let response = test.post(&presence_list_path, r#"{"invite":["@carl:ruma.test"], "drop": []}"#);
-        assert_eq!(response.status, Status::BadRequest);
+        assert_eq!(response.status, Status::UnprocessableEntity);
     }
 
     #[test]

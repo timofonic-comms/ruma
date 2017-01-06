@@ -116,8 +116,8 @@ table! {
 }
 
 table! {
-    presence_status {
-        id -> Text,
+    presence_status(user_id) {
+        user_id -> Text,
         event_id -> Text,
         presence -> Text,
         status_msg -> Nullable<Text>,
