@@ -156,8 +156,7 @@ impl Sync {
         connection: &PgConnection,
         homeserver_domain: &str,
         user: &User,
-        options: SyncOptions,
-        update_interval_presence: u64,
+        options: SyncOptions
     ) -> Result<Sync, ApiError> {
         let mut context = Context::Initial;
         if let Some(ref batch) = options.since {
@@ -177,7 +176,6 @@ impl Sync {
             homeserver_domain,
             user,
             options.set_presence,
-            update_interval_presence,
             &context
         )?;
 
@@ -199,7 +197,6 @@ impl Sync {
         homeserver_domain: &str,
         user: &User,
         set_presence: Option<PresenceState>,
-        update_interval_presence: u64,
         context: &Context
     ) -> Result<(i64, Vec<PresenceEvent>), ApiError> {
         if let Some(set_presence) = set_presence {
@@ -214,8 +211,7 @@ impl Sync {
         PresenceList::find_events_by_uid(
             connection,
             &user.id,
-            since,
-            update_interval_presence
+            since
         )
     }
 

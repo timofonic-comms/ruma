@@ -296,7 +296,7 @@ Legend:
     <th align="left" colspan="3">Presence</th>
   </tr>
   <tr>
-    <td align="center">:white_check_mark:</td>
+    <td align="center">:construction:</td>
     <td><a href="https://github.com/ruma/ruma/issues/39">#39</a></td>
     <td>PUT /presence/:user_id/status</td>
   </tr>
@@ -306,7 +306,7 @@ Legend:
     <td>GET /presence/:user_id/status</td>
   </tr>
   <tr>
-    <td align="center">:white_check_mark:</td>
+    <td align="center">:construction:</td>
     <td><a href="https://github.com/ruma/ruma/issues/41">#41</a></td>
     <td>POST /presence/list/:user_id</td>
   </tr>

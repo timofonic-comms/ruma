@@ -322,9 +322,21 @@ impl RoomMembership {
                 );
             }
         }
-        let options = user_ids.iter().map(|user_id| {
+        let missing_user_ids = User::find_missing_users(connection, invite_list)?;
+        if !missing_user_ids.is_empty() {
+            return Err(
+                ApiError::bad_json(format!(
+                    "Unknown users in invite list: {}",
+                    &missing_user_ids
+                        .iter()
+                        .map(|user_id| user_id.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                ))
+            )
+        }
 
-        let user_ids = User::find_missing_user_and_check_existence(connection, invite_list)?;
+        let options = invite_list.iter().map(|user_id| {
             RoomMembershipOptions {
                 room_id: room.id.clone(),
                 user_id: user_id.clone(),

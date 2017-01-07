@@ -124,7 +124,8 @@ impl User {
         }
     }
 
-    pub fn find_missing_user_and_check_existence(
+    /// Return `UserId`s for given `user_ids` base on the existence of a single user.
+    pub fn find_missing_users(
         connection: &PgConnection,
         user_ids: &Vec<UserId>
     ) -> Result<Vec<UserId>, ApiError> {
@@ -149,19 +150,7 @@ impl User {
             .cloned()
             .collect();
 
-        if missing_user_ids.len() > 0 {
-            return Err(
-                ApiError::bad_json(format!(
-                    "Unknown users in invite list: {}",
-                    &missing_user_ids
-                        .iter()
-                        .map(|user_id| user_id.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                ))
-            )
-        }
-        Ok(users)
+        Ok(missing_user_ids)
     }
 }
 

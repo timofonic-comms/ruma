@@ -65,7 +65,8 @@ impl PresenceStreamEvent {
             .map_err(ApiError::from)
     }
 
-    pub fn find_for_presence_list_by_uid(
+    /// Return `PresenceStreamEvent` for given `UserId` and `since`.
+    pub fn find_events_by_uid(
         connection: &PgConnection,
         user_id: &UserId,
         since: Option<i64>

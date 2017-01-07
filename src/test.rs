@@ -112,7 +112,6 @@ impl Test {
             domain: "ruma.test".to_string(),
             macaroon_secret_key: "YymznQHmKdN9B4f7iBalJB1tWEDy9LdaFSQJEtB3R5w=".into(),
             postgres_url: DATABASE_URL.to_string(),
-            update_interval_presence: 3000000,
         };
 
         let r2d2_config = R2D2Config::builder()

@@ -131,7 +131,8 @@ impl Profile {
         }
     }
 
-    pub fn find_for_presence_list_by_uid(
+    /// Return `Profile`s for given `UserId` and his `PresenceList` entries.
+    pub fn find_profiles_by_presence_list(
         connection: &PgConnection,
         user_id: &UserId,
     ) -> Result<Vec<Profile>, ApiError> {

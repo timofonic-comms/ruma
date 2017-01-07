@@ -43,11 +43,23 @@ impl PresenceList {
         drop: Vec<UserId>
     ) -> Result<(), ApiError> {
         connection.transaction::<(()), ApiError, _>(|| {
-
-            let invite = User::find_missing_user_and_check_existence(
+            let missing_user_ids = User::find_missing_users(
                 connection,
                 invite
             )?;
+            if !missing_user_ids.is_empty() {
+                return Err(
+                    ApiError::bad_json(format!(
+                        "Unknown users in invite list: {}",
+                        &missing_user_ids
+                            .iter()
+                            .map(|user_id| user_id.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    ))
+                )
+            }
+
 
             let mut invites: Vec<PresenceList> = Vec::new();
             for observed_user in invite.clone() {
@@ -61,10 +73,22 @@ impl PresenceList {
                 .execute(connection)
                 .map_err(ApiError::from)?;
 
-            let drop = User::find_missing_user_and_check_existence(
+            let missing_user_ids = User::find_missing_users(
                 connection,
                 &drop
             )?;
+            if !missing_user_ids.is_empty() {
+                return Err(
+                    ApiError::bad_json(format!(
+                        "Unknown users in drop list: {}",
+                        &missing_user_ids
+                            .iter()
+                            .map(|user_id| user_id.to_string())
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    ))
+                )
+            }
 
             let drop = presence_list::table
                 .filter(presence_list::user_id.eq(user_id))
@@ -80,18 +104,17 @@ impl PresenceList {
     pub fn find_events_by_uid(
         connection: &PgConnection,
         user_id: &UserId,
-        since: Option<i64>,
-        timeout: u64
+        since: Option<i64>
     ) -> Result<(i64, Vec<PresenceEvent>), ApiError> {
         let mut max_ordering = -1;
 
-        let stream_events= PresenceStreamEvent::find_for_presence_list_by_uid(
+        let stream_events= PresenceStreamEvent::find_events_by_uid(
             connection,
             user_id,
             since
         )?;
 
-        let profiles = Profile::find_for_presence_list_by_uid(
+        let profiles = Profile::find_profiles_by_presence_list(
             connection,
             user_id
         )?;
@@ -109,16 +132,13 @@ impl PresenceList {
                 displayname = profile.displayname.clone();
             }
 
-            let mut presence_state: PresenceState = stream_event.presence.parse().expect("Something wrong with the database!");
+            let presence_state: PresenceState = stream_event.presence.parse().expect("Something wrong with the database!");
             let last_active_ago = PresenceStatus::calculate_last_active_ago(stream_event.created_at, now)?;
-            if last_active_ago > timeout && presence_state == PresenceState::Online {
-                presence_state = PresenceState::Unavailable;
-            }
 
             events.push(PresenceEvent {
                 content: PresenceEventContent {
                     avatar_url: avatar_url,
-                    currently_active: true,
+                    currently_active: PresenceState::Online == presence_state,
                     displayname: displayname,
                     last_active_ago: Some(last_active_ago),
                     presence: presence_state,

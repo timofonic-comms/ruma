@@ -22,19 +22,6 @@ use error::ApiError;
 use models::presence_event::PresenceStreamEvent;
 use schema::presence_status;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct GetPresenceStatusResponse {
-    /// The state message for this user if one was set.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    status_msg: Option<String>,
-    /// Whether the user is currently active.
-    currently_active: bool,
-    /// The length of time in milliseconds since an action was performed by this user.
-    last_active_ago: u64,
-    /// This user's presence. One of: ["online", "offline", "unavailable"]
-    presence: PresenceState,
-}
-
 /// A Matrix presence status, not saved yet.
 #[derive(Debug, Clone, Insertable)]
 #[table_name = "presence_status"]
@@ -140,34 +127,6 @@ impl PresenceStatus {
             Err(DieselError::NotFound) => Ok(None),
             Err(err) => Err(ApiError::from(err)),
         }
-    }
-
-    pub fn find_by_uid_and_convert_as_response(
-        connection: &PgConnection,
-        user_id: UserId,
-        timeout: u64
-    ) -> Result<GetPresenceStatusResponse, ApiError> {
-        let status = PresenceStatus::find_by_uid(&connection, &user_id)?;
-        let status: PresenceStatus = match status {
-            Some(event) => event,
-            None => return Err(
-                ApiError::not_found("The given user_id does not correspond to an presence status".to_string())
-            ),
-        };
-
-        let mut presence_state: PresenceState = status.presence.parse().expect("Something wrong with the database!");
-        let now = SystemTime::now();
-        let last_active_ago = PresenceStatus::calculate_last_active_ago(status.updated_at, now)?;
-        if last_active_ago > timeout && presence_state == PresenceState::Online {
-            presence_state = PresenceState::Unavailable;
-        }
-
-        Ok(GetPresenceStatusResponse {
-            status_msg: status.status_msg,
-            currently_active: PresenceState::Online == presence_state,
-            last_active_ago: last_active_ago,
-            presence: presence_state,
-        })
     }
 
     /// Calculate the difference between two SystemTimes in milliseconds.

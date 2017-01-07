@@ -85,7 +85,7 @@ impl Handler for Sync {
             timeout: timeout,
         };
 
-        let response = query::Sync::sync(&connection, &config.domain, &user, options, config.update_interval_presence)?;
+        let response = query::Sync::sync(&connection, &config.domain, &user, options)?;
 
         Ok(Response::with((Status::Ok, SerializableResponse(response))))
     }
@@ -424,10 +424,17 @@ mod tests {
             .unwrap();
         let mut events = array.into_iter();
         assert_eq!(events.len(), 2);
-        let event = events.next().unwrap();
-        assert_eq!(event.find_path(&["content", "user_id"]).unwrap().as_str().unwrap(), bob_id);
-        let event = events.next().unwrap();
-        assert_eq!(event.find_path(&["content", "user_id"]).unwrap().as_str().unwrap(), carl_id);
+
+        assert_eq!(
+            events.next().unwrap().find_path(&["content", "user_id"]).unwrap().as_str().unwrap(),
+            bob_id
+        );
+
+        assert_eq!(
+            events.next().unwrap().find_path(&["content", "user_id"]).unwrap().as_str().unwrap(),
+            carl_id
+        );
+
         let next_batch = Test::get_next_batch(&response);
         let options = SyncOptions {
             filter: None,
