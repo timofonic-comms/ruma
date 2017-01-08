@@ -20,7 +20,6 @@ use ruma_identifiers::UserId;
 use error::ApiError;
 use models::presence_status::PresenceStatus;
 use models::presence_event::PresenceStreamEvent;
-use models::profile::Profile;
 use models::user::User;
 use schema::presence_list;
 
@@ -114,32 +113,19 @@ impl PresenceList {
             since
         )?;
 
-        let profiles = Profile::find_profiles_by_presence_list(
-            connection,
-            user_id
-        )?;
-
         let mut events = Vec::new();
         let now = SystemTime::now();
         for stream_event in stream_events {
             max_ordering = cmp::max(stream_event.ordering, max_ordering);
-
-            let profile: Option<&Profile> = profiles.iter().filter(|profile| profile.id == stream_event.user_id).next();
-            let mut avatar_url = None;
-            let mut displayname = None;
-            if let Some(ref profile) = profile {
-                avatar_url = profile.avatar_url.clone();
-                displayname = profile.displayname.clone();
-            }
 
             let presence_state: PresenceState = stream_event.presence.parse().expect("Something wrong with the database!");
             let last_active_ago = PresenceStatus::calculate_last_active_ago(stream_event.created_at, now)?;
 
             events.push(PresenceEvent {
                 content: PresenceEventContent {
-                    avatar_url: avatar_url,
+                    avatar_url: stream_event.avatar_url,
                     currently_active: PresenceState::Online == presence_state,
-                    displayname: displayname,
+                    displayname: stream_event.displayname,
                     last_active_ago: Some(last_active_ago),
                     presence: presence_state,
                     user_id: stream_event.user_id,

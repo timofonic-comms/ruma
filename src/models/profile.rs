@@ -2,21 +2,17 @@
 
 use diesel::{
     insert,
-    ExpressionMethods,
-    FilterDsl,
     FindDsl,
     LoadDsl,
     SaveChangesDsl,
-    SelectDsl,
 };
-use diesel::expression::dsl::any;
 use diesel::pg::PgConnection;
 use diesel::result::Error as DieselError;
 use ruma_identifiers::UserId;
 
 use error::ApiError;
 use models::room_membership::{RoomMembership, RoomMembershipOptions};
-use schema::{profiles, presence_list};
+use schema::profiles;
 
 /// A Matrix profile.
 #[derive(AsChangeset, Debug, Clone, Identifiable, Insertable, Queryable)]
@@ -34,7 +30,7 @@ impl Profile {
     /// Update or Create a `Profile` entry with new avatar_url.
     pub fn update_avatar_url(connection: &PgConnection, user_id: UserId, avatar_url: Option<String>)
     -> Result<Profile, ApiError> {
-        let profile = Profile::find_by_uid(connection, user_id.clone())?;
+        let profile = Profile::find_by_uid(connection, &user_id)?;
 
         match profile {
             Some(mut profile) => profile.set_avatar_url(connection, avatar_url),
@@ -53,7 +49,7 @@ impl Profile {
     /// Update or Create a `Profile` entry with new displayname.
     pub fn update_displayname(connection: &PgConnection, user_id: UserId, displayname: Option<String>)
     -> Result<Profile, ApiError> {
-        let profile = Profile::find_by_uid(connection, user_id.clone())?;
+        let profile = Profile::find_by_uid(connection, &user_id)?;
 
         match profile {
             Some(mut profile) => profile.set_displayname(connection, displayname),
@@ -119,7 +115,7 @@ impl Profile {
     }
 
     /// Return `Profile` for given `UserId`.
-    pub fn find_by_uid(connection: &PgConnection, user_id: UserId) -> Result<Option<Profile>, ApiError> {
+    pub fn find_by_uid(connection: &PgConnection, user_id: &UserId) -> Result<Option<Profile>, ApiError> {
         let profile = profiles::table
             .find(user_id)
             .get_result(connection);
@@ -129,19 +125,5 @@ impl Profile {
             Err(DieselError::NotFound) => Ok(None),
             Err(err) => Err(ApiError::from(err)),
         }
-    }
-
-    /// Return `Profile`s for given `UserId` and his `PresenceList` entries.
-    pub fn find_profiles_by_presence_list(
-        connection: &PgConnection,
-        user_id: &UserId,
-    ) -> Result<Vec<Profile>, ApiError> {
-        let users = presence_list::table
-            .filter(presence_list::user_id.eq(user_id))
-            .select(presence_list::observed_user_id);
-        profiles::table
-            .filter(profiles::id.eq(any(users)))
-            .get_results(connection)
-            .map_err(ApiError::from)
     }
 }

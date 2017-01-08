@@ -92,7 +92,7 @@ impl RoomMembership {
     -> Result<RoomMembership, ApiError> {
         RoomMembership::verify_creation_priviledges(connection, &options)?;
 
-        let profile = Profile::find_by_uid(connection, options.user_id.clone())?;
+        let profile = Profile::find_by_uid(connection, &options.user_id)?;
 
         let new_member_event = RoomMembership::create_new_room_member_event(
             homeserver_domain,
@@ -126,7 +126,7 @@ impl RoomMembership {
         for option in options {
             RoomMembership::verify_creation_priviledges(connection, &option)?;
 
-            let profile = Profile::find_by_uid(connection, option.user_id.clone())?;
+            let profile = Profile::find_by_uid(connection, &option.user_id)?;
 
             let new_member_event = RoomMembership::create_new_room_member_event(
                 homeserver_domain,
@@ -245,7 +245,7 @@ impl RoomMembership {
     /// After the update a new `MemberEvent` is created.
     pub fn update(&mut self, connection: &PgConnection, homeserver_domain: &str, options: RoomMembershipOptions)
     -> Result<RoomMembership, ApiError> {
-        let profile = Profile::find_by_uid(connection, options.user_id.clone())?;
+        let profile = Profile::find_by_uid(connection, &options.user_id)?;
 
         let event = RoomMembership::create_new_room_member_event(
             homeserver_domain,

@@ -138,6 +138,8 @@ table! {
         event_id -> Text,
         user_id -> Text,
         presence -> Text,
+        avatar_url -> Nullable<Text>,
+        displayname -> Nullable<Text>,
         created_at -> Timestamp,
     }
 }

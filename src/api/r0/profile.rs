@@ -35,7 +35,7 @@ impl Handler for Profile {
 
         let connection = DB::from_request(request)?;
 
-        let profile = DataProfile::find_by_uid(&connection, user_id.clone())?;
+        let profile = DataProfile::find_by_uid(&connection, &user_id)?;
 
         let response = match profile {
             Some(profile) => {
@@ -72,7 +72,7 @@ impl Handler for GetAvatarUrl {
 
         let connection = DB::from_request(request)?;
 
-        let profile = DataProfile::find_by_uid(&connection, user_id.clone())?;
+        let profile = DataProfile::find_by_uid(&connection, &user_id)?;
 
         let response = match profile {
             Some(profile) => {
@@ -162,7 +162,7 @@ impl Handler for GetDisplayName {
 
         let connection = DB::from_request(request)?;
 
-        let profile = DataProfile::find_by_uid(&connection, user_id.clone())?;
+        let profile = DataProfile::find_by_uid(&connection, &user_id)?;
 
         let response = match profile {
             Some(profile) => {

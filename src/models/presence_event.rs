@@ -16,6 +16,7 @@ use ruma_events::presence::PresenceState;
 use ruma_identifiers::{EventId, UserId};
 
 use error::ApiError;
+use models::profile::Profile;
 use schema::{presence_events, presence_list};
 
 /// A Matrix presence stream, not saved yet.
@@ -28,6 +29,10 @@ pub struct NewPresenceStreamEvent {
     pub user_id: UserId,
     /// The current presence state.
     pub presence: String,
+    /// The avatar url.
+    pub avatar_url: Option<String>,
+    /// The display name.
+    pub displayname: Option<String>,
 }
 
 /// A Matrix presence stream.
@@ -41,6 +46,10 @@ pub struct PresenceStreamEvent {
     pub user_id: UserId,
     /// The current presence state.
     pub presence: String,
+    /// The avatar url.
+    pub avatar_url: Option<String>,
+    /// The display name.
+    pub displayname: Option<String>,
     /// The time the event was created.
     pub created_at: SystemTime,
 }
@@ -54,10 +63,21 @@ impl PresenceStreamEvent {
         user_id: &UserId,
         presence: PresenceState
     ) -> Result<PresenceStreamEvent, ApiError> {
+        let profile = Profile::find_by_uid(connection, user_id)?;
+
+        let mut avatar_url = None;
+        let mut displayname = None;
+        if let Some(ref profile) = profile {
+            avatar_url = profile.avatar_url.clone();
+            displayname = profile.displayname.clone();
+        }
+
         let new_event = NewPresenceStreamEvent {
             event_id: event_id.clone(),
             user_id: user_id.clone(),
-            presence: presence.to_string()
+            presence: presence.to_string(),
+            avatar_url: avatar_url,
+            displayname: displayname,
         };
         insert(&new_event)
             .into(presence_events::table)
