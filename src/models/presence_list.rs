@@ -118,8 +118,12 @@ impl PresenceList {
         for stream_event in stream_events {
             max_ordering = cmp::max(stream_event.ordering, max_ordering);
 
-            let presence_state: PresenceState = stream_event.presence.parse().expect("Something wrong with the database!");
-            let last_active_ago = PresenceStatus::calculate_last_active_ago(stream_event.created_at, now)?;
+            let presence_state: PresenceState = stream_event.presence.parse()
+                .expect("Database insert should ensure a PresenceState");
+            let last_active_ago = PresenceStatus::calculate_time_difference(
+                stream_event.created_at,
+                now
+            )?;
 
             events.push(PresenceEvent {
                 content: PresenceEventContent {

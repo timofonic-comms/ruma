@@ -8,8 +8,7 @@ use diesel::{
     insert,
     Connection,
     ExecuteDsl,
-    ExpressionMethods,
-    FilterDsl,
+    FindDsl,
     LoadDsl,
     SaveChangesDsl,
 };
@@ -118,9 +117,7 @@ impl PresenceStatus {
         connection: &PgConnection,
         user_id: &UserId
     ) -> Result<Option<PresenceStatus>, ApiError> {
-        let status = presence_status::table
-            .filter(presence_status::user_id.eq(user_id))
-            .first(connection);
+        let status = presence_status::table.find(user_id).first(connection);
 
         match status{
             Ok(status) => Ok(Some(status)),
@@ -130,7 +127,7 @@ impl PresenceStatus {
     }
 
     /// Calculate the difference between two SystemTimes in milliseconds.
-    pub fn calculate_last_active_ago(since: SystemTime, now: SystemTime) -> Result<u64, ApiError> {
+    pub fn calculate_time_difference(since: SystemTime, now: SystemTime) -> Result<u64, ApiError> {
         let elapsed = now.duration_since(since).map_err(ApiError::from)?;
         let mut millis = elapsed.as_secs() * 1_000;
         millis += (elapsed.subsec_nanos() / 1_000_000) as u64;
@@ -141,8 +138,8 @@ impl PresenceStatus {
 #[test]
 fn calculate_last_active_ago_work_correctly() {
     let now = SystemTime::now();
-    assert_eq!(PresenceStatus::calculate_last_active_ago(now, now).unwrap(), 0);
+    assert_eq!(PresenceStatus::calculate_time_difference(now, now).unwrap(), 0);
     let now = SystemTime::now();
     let added = now + Duration::from_millis(1500);
-    assert_eq!(PresenceStatus::calculate_last_active_ago(now, added).unwrap(), 1500);
+    assert_eq!(PresenceStatus::calculate_time_difference(now, added).unwrap(), 1500);
 }

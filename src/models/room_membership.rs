@@ -2,7 +2,6 @@
 
 use std::convert::TryInto;
 use std::error::Error;
-use std::iter::FromIterator;
 
 use diesel::{
     Connection,

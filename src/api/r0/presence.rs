@@ -92,18 +92,17 @@ impl Handler for GetPresenceStatus {
 
         let connection = DB::from_request(request)?;
 
-        let status = PresenceStatus::find_by_uid(&connection, &user_id)?;
-        let status: PresenceStatus = match status {
-            Some(event) => event,
+        let status = match PresenceStatus::find_by_uid(&connection, &user_id)? {
+            Some(status) => status,
             None => return Err(IronError::from(
                 ApiError::not_found("The given user_id does not correspond to an presence status".to_string())
             )),
         };
 
         let presence_state: PresenceState = status.presence.parse()
-            .expect("Something wrong with the database!");
+            .expect("Database insert should ensure a PresenceState");
         let now = SystemTime::now();
-        let last_active_ago = PresenceStatus::calculate_last_active_ago(status.updated_at, now)?;
+        let last_active_ago = PresenceStatus::calculate_time_difference(status.updated_at, now)?;
 
         let response = GetPresenceStatusResponse {
             status_msg: status.status_msg,
