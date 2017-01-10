@@ -20,6 +20,7 @@ use ruma_identifiers::UserId;
 use error::ApiError;
 use models::presence_status::PresenceStatus;
 use models::presence_event::PresenceStreamEvent;
+use models::room_membership::RoomMembership;
 use models::user::User;
 use schema::presence_list;
 
@@ -59,12 +60,30 @@ impl PresenceList {
                 )
             }
 
+            let room_ids = RoomMembership::find_room_ids_by_uid_and_state(
+                connection,
+                user_id,
+                "join"
+            )?;
 
             let mut invites: Vec<PresenceList> = Vec::new();
-            for observed_user in invite.clone() {
+            for ref observed_user in invite.clone() {
+                if observed_user != user_id {
+                    let rooms = RoomMembership::find_shared_rooms_by_rooms_and_uid(
+                        connection,
+                        &room_ids,
+                        observed_user
+                    )?;
+                    if rooms.is_empty() {
+                        return Err(ApiError::unauthorized(format!(
+                            "You are not authorized to get the presence status for th given user_id: {}.",
+                            observed_user
+                        )))
+                    }
+                }
                 invites.push(PresenceList {
                     user_id: user_id.clone(),
-                    observed_user_id: observed_user,
+                    observed_user_id: observed_user.clone(),
                 });
             }
             insert(&invites)

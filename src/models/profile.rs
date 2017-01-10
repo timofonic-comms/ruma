@@ -2,6 +2,7 @@
 
 use diesel::{
     insert,
+    Connection,
     FindDsl,
     LoadDsl,
     SaveChangesDsl,
@@ -12,6 +13,7 @@ use ruma_identifiers::UserId;
 
 use error::ApiError;
 use models::room_membership::{RoomMembership, RoomMembershipOptions};
+use models::presence_status::PresenceStatus;
 use schema::profiles;
 
 /// A Matrix profile.
@@ -28,41 +30,57 @@ pub struct Profile {
 
 impl Profile {
     /// Update or Create a `Profile` entry with new avatar_url.
-    pub fn update_avatar_url(connection: &PgConnection, user_id: UserId, avatar_url: Option<String>)
-    -> Result<Profile, ApiError> {
-        let profile = Profile::find_by_uid(connection, &user_id)?;
+    pub fn update_avatar_url(
+        connection: &PgConnection,
+        homeserver_domain: &str,
+        user_id: UserId,
+        avatar_url: Option<String>
+    ) -> Result<Profile, ApiError> {
+        connection.transaction::<Profile, ApiError, _>(|| {
+            let profile = Profile::find_by_uid(connection, &user_id)?;
 
-        match profile {
-            Some(mut profile) => profile.set_avatar_url(connection, avatar_url),
-            None => {
-                let new_profile = Profile {
-                    id: user_id.clone(),
-                    avatar_url: avatar_url,
-                    displayname: None,
-                };
+            let profile = match profile {
+                Some(mut profile) => profile.set_avatar_url(connection, avatar_url)?,
+                None => {
+                    let new_profile = Profile {
+                        id: user_id.clone(),
+                        avatar_url: avatar_url,
+                        displayname: None,
+                    };
+                    Profile::create(connection, &new_profile)?
+                }
+            };
 
-                Profile::create(connection, &new_profile)
-            }
-        }
+            PresenceStatus::update_after_changed_profile(connection, homeserver_domain, &user_id)?;
+            Ok(profile)
+        }).map_err(ApiError::from)
     }
 
     /// Update or Create a `Profile` entry with new displayname.
-    pub fn update_displayname(connection: &PgConnection, user_id: UserId, displayname: Option<String>)
-    -> Result<Profile, ApiError> {
-        let profile = Profile::find_by_uid(connection, &user_id)?;
+    pub fn update_displayname(
+        connection: &PgConnection,
+        homeserver_domain: &str,
+        user_id: UserId,
+        displayname: Option<String>
+    ) -> Result<Profile, ApiError> {
+        connection.transaction::<Profile, ApiError, _>(|| {
+            let profile = Profile::find_by_uid(connection, &user_id)?;
 
-        match profile {
-            Some(mut profile) => profile.set_displayname(connection, displayname),
-            None => {
-                let new_profile = Profile {
-                    id: user_id.clone(),
-                    avatar_url: None,
-                    displayname: displayname,
-                };
+            let profile = match profile {
+                Some(mut profile) => profile.set_displayname(connection, displayname)?,
+                None => {
+                    let new_profile = Profile {
+                        id: user_id.clone(),
+                        avatar_url: None,
+                        displayname: displayname,
+                    };
+                    Profile::create(connection, &new_profile)?
+                }
+            };
 
-                Profile::create(connection, &new_profile)
-            }
-        }
+            PresenceStatus::update_after_changed_profile(connection, homeserver_domain, &user_id)?;
+            Ok(profile)
+        }).map_err(ApiError::from)
     }
 
     /// Update a `Profile` entry with new avatar_url.

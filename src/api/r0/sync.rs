@@ -12,9 +12,9 @@ use config::Config;
 use db::DB;
 use error::ApiError;
 use middleware::{AccessTokenAuth, MiddlewareChain};
+use models::user::User;
 use modifier::SerializableResponse;
 use query::{self, Batch, SyncOptions};
-use models::user::User;
 
 /// The `/sync` endpoint.
 pub struct Sync;
@@ -380,12 +380,16 @@ mod tests {
     #[test]
     fn basic_presence_state() {
         let test = Test::new();
+        let (carl, room_id) = test.initial_fixtures("carl", r#"{"visibility": "public"}"#);
         let access_token = test.create_access_token_with_username("alice");
         let bob = test.create_access_token_with_username("bob");
-        let carl = test.create_access_token_with_username("carl");
         let user_id = "@alice:ruma.test";
         let bob_id = "@bob:ruma.test";
         let carl_id = "@carl:ruma.test";
+        let response = test.join_room(&access_token, &room_id);
+        assert_eq!(response.status, Status::Ok);
+        let response = test.join_room(&bob, &room_id);
+        assert_eq!(response.status, Status::Ok);
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
@@ -394,14 +398,6 @@ mod tests {
         );
         let response = test.post(&presence_list_path, r#"{"invite":["@bob:ruma.test", "@carl:ruma.test"], "drop": []}"#);
         assert_eq!(response.status, Status::Ok);
-
-        let avatar_url_body = r#"{"avatar_url": "mxc://matrix.org/some/url"}"#;
-        let avatar_url_path = format!(
-            "/_matrix/client/r0/profile/{}/avatar_url?access_token={}",
-            bob_id,
-            bob
-        );
-        assert!(test.put(&avatar_url_path, avatar_url_body).status.is_success());
 
         test.update_presence(&bob, &bob_id, r#"{"presence":"online"}"#);
         test.update_presence(&carl, &carl_id, r#"{"presence":"online"}"#);

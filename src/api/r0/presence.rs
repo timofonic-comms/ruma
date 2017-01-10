@@ -13,6 +13,7 @@ use db::DB;
 use error::ApiError;
 use middleware::{AccessTokenAuth, JsonRequest, MiddlewareChain, UserIdParam};
 use modifier::SerializableResponse;
+use models::room_membership::RoomMembership;
 use models::presence_list::PresenceList;
 use models::presence_status::PresenceStatus;
 use models::user::User;
@@ -90,7 +91,19 @@ impl Handler for GetPresenceStatus {
         let user_id = request.extensions.get::<UserIdParam>()
             .expect("UserIdParam should ensure a UserId").clone();
 
+        let user = request.extensions.get::<User>()
+            .expect("AccessTokenAuth should ensure a user").clone();
+
         let connection = DB::from_request(request)?;
+
+        if user.id != user_id {
+            let rooms = RoomMembership::find_shared_rooms_by_uid(&connection, &user.id, &user_id)?;
+            if rooms.is_empty() {
+                return Err(IronError::from(
+                    ApiError::unauthorized(format!("You are not authorized to get the presence status for th given user_id: {}.", user_id))
+                ))
+            }
+        }
 
         let status = match PresenceStatus::find_by_uid(&connection, &user_id)? {
             Some(status) => status,
@@ -232,6 +245,24 @@ mod tests {
     }
 
     #[test]
+    fn forbidden_get_presence_status_no_shared_room() {
+        let test = Test::new();
+        let alice = test.create_access_token_with_username("alice");
+        let access_token = test.create_access_token_with_username("carl");
+        let user_id = "@carl:ruma.test";
+
+        test.update_presence(&access_token, &user_id, r#"{"presence":"online"}"#);
+
+        let presence_status_path = format!(
+            "/_matrix/client/r0/presence/{}/status?access_token={}",
+            user_id,
+            alice
+        );
+        let response = test.get(&presence_status_path);
+        assert_eq!(response.status, Status::Forbidden);
+    }
+
+    #[test]
     fn not_found_presence_status() {
         let test = Test::new();
         let access_token = test.create_access_token_with_username("alice");
@@ -265,12 +296,16 @@ mod tests {
     #[test]
     fn basic_presence_list() {
         let test = Test::new();
-        let access_token = test.create_access_token_with_username("alice");
         let bob = test.create_access_token_with_username("bob");
-        let carl = test.create_access_token_with_username("carl");
+        let access_token = test.create_access_token_with_username("alice");
+        let (carl, room_id) = test.initial_fixtures("carl", r#"{"visibility": "public"}"#);
         let user_id = "@alice:ruma.test";
         let bob_id = "@bob:ruma.test";
         let carl_id = "@carl:ruma.test";
+        let response = test.join_room(&access_token, &room_id);
+        assert_eq!(response.status, Status::Ok);
+        let response = test.join_room(&bob, &room_id);
+        assert_eq!(response.status, Status::Ok);
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
@@ -316,6 +351,23 @@ mod tests {
     }
 
     #[test]
+    fn forbidden_presence_list_no_shared_room() {
+        let test = Test::new();
+        let _ = test.create_access_token_with_username("carl");
+        let access_token = test.create_access_token_with_username("alice");
+        let _  = test.create_access_token_with_username("bob");
+        let user_id = "@alice:ruma.test";
+
+        let presence_list_path = format!(
+            "/_matrix/client/r0/presence/list/{}?access_token={}",
+            user_id,
+            access_token
+        );
+        let response = test.post(&presence_list_path, r#"{"invite":["@bob:ruma.test", "@carl:ruma.test"], "drop": []}"#);
+        assert_eq!(response.status, Status::Forbidden);
+    }
+
+    #[test]
     fn invitee_does_not_exist_presence_list() {
         let test = Test::new();
         let access_token = test.create_access_token_with_username("alice");
@@ -346,10 +398,13 @@ mod tests {
     #[test]
     fn test_drop_presence_list() {
         let test = Test::new();
-        let access_token = test.create_access_token_with_username("alice");
+        let (access_token, room_id) = test.initial_fixtures("alice", r#"{"visibility": "public"}"#);
         let bob = test.create_access_token_with_username("bob");
         let user_id = "@alice:ruma.test";
         let bob_id = "@bob:ruma.test";
+
+        let response = test.join_room(&bob, &room_id);
+        assert_eq!(response.status, Status::Ok);
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",

@@ -363,32 +363,79 @@ impl RoomMembership {
                 _ => ApiError::from(err),
             })?;
 
-        events.into_iter() .map(TryInto::try_into). collect()
+        events.into_iter().map(TryInto::try_into).collect()
     }
 
     /// Return `RoomMembership`'s for given `UserId` order by `RoomId`.
     pub fn find_by_user_id_order_by_room_id(connection: &PgConnection, user_id: &UserId) -> Result<Vec<RoomMembership>, ApiError> {
-        let room_memberships: Vec<RoomMembership> = room_memberships::table
+        room_memberships::table
             .filter(room_memberships::user_id.eq(user_id))
             .order(room_memberships::room_id)
             .get_results(connection)
             .map_err(|err| match err {
                 DieselError::NotFound => ApiError::not_found(None),
                 _ => ApiError::from(err),
-            })?;
-        Ok(room_memberships)
+            })
     }
 
     /// Return `RoomMembership`'s for given `UserId` and `MembershipState`.
     pub fn find_by_uid_and_state(connection: &PgConnection, user_id: UserId, membership: &str) -> Result<Vec<RoomMembership>, ApiError> {
-        let room_memberships: Vec<RoomMembership> = room_memberships::table
+        room_memberships::table
             .filter(room_memberships::user_id.eq(user_id))
             .filter(room_memberships::membership.eq(membership))
             .get_results(connection)
             .map_err(|err| match err {
                 DieselError::NotFound => ApiError::not_found(None),
                 _ => ApiError::from(err),
-            })?;
-        Ok(room_memberships)
+            })
+    }
+
+    /// Return `RoomId`'s for given `UserId` and `MembershipState`.
+    pub fn find_room_ids_by_uid_and_state(
+        connection: &PgConnection,
+        user_id: &UserId,
+        membership: &str
+    ) -> Result<Vec<RoomId>, ApiError> {
+        room_memberships::table
+            .filter(room_memberships::user_id.eq(user_id))
+            .filter(room_memberships::membership.eq(membership))
+            .select(room_memberships::room_id)
+            .get_results(connection)
+            .map_err(ApiError::from)
+    }
+
+    /// Return `RoomId`'s for given `UserId` and observed `UserId`.
+    pub fn find_shared_rooms_by_uid(
+        connection: &PgConnection,
+        user_id: &UserId,
+        observed_user_id: &UserId
+    ) -> Result<Vec<RoomId>, ApiError> {
+        let rooms = room_memberships::table
+            .filter(room_memberships::user_id.eq(user_id))
+            .filter(room_memberships::membership.eq("join"))
+            .select(room_memberships::room_id);
+
+        room_memberships::table
+            .filter(room_memberships::user_id.eq(observed_user_id))
+            .filter(room_memberships::membership.eq("join"))
+            .filter(room_memberships::room_id.eq(any(rooms)))
+            .select(room_memberships::room_id)
+            .get_results(connection)
+            .map_err(ApiError::from)
+    }
+
+    /// Return `RoomId`'s for given `RoomId`'s and observed `UserId`.
+    pub fn find_shared_rooms_by_rooms_and_uid(
+        connection: &PgConnection,
+        room_ids: &Vec<RoomId>,
+        observed_user_id: &UserId
+    ) -> Result<Vec<RoomId>, ApiError> {
+        room_memberships::table
+            .filter(room_memberships::user_id.eq(observed_user_id))
+            .filter(room_memberships::membership.eq("join"))
+            .filter(room_memberships::room_id.eq(any(room_ids)))
+            .select(room_memberships::room_id)
+            .get_results(connection)
+            .map_err(ApiError::from)
     }
 }

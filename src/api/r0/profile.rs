@@ -131,6 +131,7 @@ impl Handler for PutAvatarUrl {
 
         DataProfile::update_avatar_url(
             &connection,
+            &config.domain,
             user_id.clone(),
             avatar_url_request.avatar_url
         )?;
@@ -221,6 +222,7 @@ impl Handler for PutDisplayName {
 
         DataProfile::update_displayname(
             &connection,
+            &config.domain,
             user_id.clone(),
             displayname_request.displayname
         )?;
@@ -236,6 +238,7 @@ impl Handler for PutDisplayName {
 mod tests {
     use test::Test;
     use iron::status::Status;
+    use query::SyncOptions;
 
     #[test]
     fn get_displayname_non_existent_user() {
@@ -439,5 +442,165 @@ mod tests {
             response.json().find("error").unwrap().as_str().unwrap(),
             format!("No profile found for {}", user_id)
         );
+    }
+
+    #[test]
+    fn update_presence_after_changed_avatar_url() {
+        let test = Test::new();
+        let carl = test.create_access_token_with_username("carl");
+        let carl_id = "@carl:ruma.test";
+
+        let presence_list_path = format!(
+            "/_matrix/client/r0/presence/list/{}?access_token={}",
+            carl_id,
+            carl
+        );
+        let response = test.post(&presence_list_path, r#"{"invite":["@carl:ruma.test"], "drop": []}"#);
+        assert_eq!(response.status, Status::Ok);
+
+        let avatar_url_body = r#"{"avatar_url": "mxc://matrix.org/some/url"}"#;
+        let avatar_url_path = format!(
+            "/_matrix/client/r0/profile/{}/avatar_url?access_token={}",
+            carl_id,
+            carl
+        );
+        assert!(test.put(&avatar_url_path, avatar_url_body).status.is_success());
+
+        test.update_presence(&carl, &carl_id, r#"{"presence":"online"}"#);
+
+        let options = SyncOptions {
+            filter: None,
+            since: None,
+            full_state: false,
+            set_presence: None,
+            timeout: 0
+        };
+        let response = test.sync(&carl, options);
+        let array = response
+            .json()
+            .find("presence")
+            .unwrap()
+            .find("events")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        let mut events = array.into_iter();
+        assert_eq!(events.len(), 1);
+        let content = events.next().unwrap().find("content").unwrap();
+
+        assert_eq!(content.find("user_id").unwrap().as_str().unwrap(), carl_id);
+        assert_eq!(content.find("avatar_url").unwrap().as_str().unwrap(), "mxc://matrix.org/some/url");
+
+        let next_batch = Test::get_next_batch(&response);
+
+        let avatar_url_body = r#"{"avatar_url": "mxc://matrix.org/some/new"}"#;
+        let avatar_url_path = format!(
+            "/_matrix/client/r0/profile/{}/avatar_url?access_token={}",
+            carl_id,
+            carl
+        );
+        assert!(test.put(&avatar_url_path, avatar_url_body).status.is_success());
+
+        let options = SyncOptions {
+            filter: None,
+            since: Some(next_batch),
+            full_state: false,
+            set_presence: None,
+            timeout: 0
+        };
+        let response = test.sync(&carl, options);
+        let array = response
+            .json()
+            .find("presence")
+            .unwrap()
+            .find("events")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        let mut events = array.into_iter();
+        assert_eq!(events.len(), 1);
+        let content = events.next().unwrap().find("content").unwrap();
+
+        assert_eq!(content.find("user_id").unwrap().as_str().unwrap(), carl_id);
+        assert_eq!(content.find("avatar_url").unwrap().as_str().unwrap(), "mxc://matrix.org/some/new");
+    }
+
+    #[test]
+    fn update_presence_after_changed_displayname() {
+        let test = Test::new();
+        let carl = test.create_access_token_with_username("carl");
+        let carl_id = "@carl:ruma.test";
+
+        let presence_list_path = format!(
+            "/_matrix/client/r0/presence/list/{}?access_token={}",
+            carl_id,
+            carl
+        );
+        let response = test.post(&presence_list_path, r#"{"invite":["@carl:ruma.test"], "drop": []}"#);
+        assert_eq!(response.status, Status::Ok);
+
+        let put_displayname_path = format!(
+            "/_matrix/client/r0/profile/{}/displayname?access_token={}",
+            carl_id,
+            carl
+        );
+        assert!(test.put(&put_displayname_path, r#"{"displayname": "Alice"}"#).status.is_success());
+
+        test.update_presence(&carl, &carl_id, r#"{"presence":"online"}"#);
+
+        let options = SyncOptions {
+            filter: None,
+            since: None,
+            full_state: false,
+            set_presence: None,
+            timeout: 0
+        };
+        let response = test.sync(&carl, options);
+        let array = response
+            .json()
+            .find("presence")
+            .unwrap()
+            .find("events")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        let mut events = array.into_iter();
+        assert_eq!(events.len(), 1);
+        let content = events.next().unwrap().find("content").unwrap();
+
+        assert_eq!(content.find("user_id").unwrap().as_str().unwrap(), carl_id);
+        assert_eq!(content.find("displayname").unwrap().as_str().unwrap(), "Alice");
+
+        let next_batch = Test::get_next_batch(&response);
+
+        let put_displayname_path = format!(
+            "/_matrix/client/r0/profile/{}/displayname?access_token={}",
+            carl_id,
+            carl
+        );
+        assert!(test.put(&put_displayname_path, r#"{"displayname": "Bogus"}"#).status.is_success());
+
+        let options = SyncOptions {
+            filter: None,
+            since: Some(next_batch),
+            full_state: false,
+            set_presence: None,
+            timeout: 0
+        };
+        let response = test.sync(&carl, options);
+        let array = response
+            .json()
+            .find("presence")
+            .unwrap()
+            .find("events")
+            .unwrap()
+            .as_array()
+            .unwrap();
+        let mut events = array.into_iter();
+        assert_eq!(events.len(), 1);
+        let content = events.next().unwrap().find("content").unwrap();
+
+        assert_eq!(content.find("user_id").unwrap().as_str().unwrap(), carl_id);
+        assert_eq!(content.find("displayname").unwrap().as_str().unwrap(), "Bogus");
     }
 }

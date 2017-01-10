@@ -112,6 +112,32 @@ impl PresenceStatus {
         Ok(())
     }
 
+    pub fn update_after_changed_profile(
+        connection: &PgConnection,
+        homeserver_domain: &str,
+        user_id: &UserId
+    ) -> Result<(), ApiError> {
+        let mut presence_state = PresenceState::Unavailable;
+        let mut status_msg = None;
+
+        match PresenceStatus::find_by_uid(connection, user_id)? {
+            Some(status) => {
+                presence_state = status.presence.parse()
+                    .expect("Database insert should ensure a PresenceState");
+                status_msg = status.status_msg;
+            },
+            None => (),
+        }
+
+        PresenceStatus::upsert(
+            connection,
+            homeserver_domain,
+            user_id,
+            presence_state,
+            status_msg
+        )
+    }
+
     /// Return `PresenceStatus` for given `UserId`.
     pub fn find_by_uid(
         connection: &PgConnection,
