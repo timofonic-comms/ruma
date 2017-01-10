@@ -3,10 +3,14 @@
 use diesel::{
     insert,
     Connection,
+    ExpressionMethods,
+    FilterDsl,
     FindDsl,
     LoadDsl,
     SaveChangesDsl,
+    SelectDsl,
 };
+use diesel::expression::dsl::any;
 use diesel::pg::PgConnection;
 use diesel::result::Error as DieselError;
 use ruma_identifiers::UserId;
@@ -14,7 +18,7 @@ use ruma_identifiers::UserId;
 use error::ApiError;
 use models::room_membership::{RoomMembership, RoomMembershipOptions};
 use models::presence_status::PresenceStatus;
-use schema::profiles;
+use schema::{profiles, presence_list};
 
 /// A Matrix profile.
 #[derive(AsChangeset, Debug, Clone, Identifiable, Insertable, Queryable)]
@@ -51,7 +55,7 @@ impl Profile {
                 }
             };
 
-            PresenceStatus::update_after_changed_profile(connection, homeserver_domain, &user_id)?;
+            PresenceStatus::update_by_uid_and_status(connection, homeserver_domain, &user_id)?;
             Ok(profile)
         }).map_err(ApiError::from)
     }
@@ -78,7 +82,7 @@ impl Profile {
                 }
             };
 
-            PresenceStatus::update_after_changed_profile(connection, homeserver_domain, &user_id)?;
+            PresenceStatus::update_by_uid_and_status(connection, homeserver_domain, &user_id)?;
             Ok(profile)
         }).map_err(ApiError::from)
     }
@@ -143,5 +147,19 @@ impl Profile {
             Err(DieselError::NotFound) => Ok(None),
             Err(err) => Err(ApiError::from(err)),
         }
+    }
+
+    /// Return `Profile`s for given `UserId` and his `PresenceList` entries.
+    pub fn find_profiles_by_presence_list(
+        connection: &PgConnection,
+        user_id: &UserId,
+    ) -> Result<Vec<Profile>, ApiError> {
+        let users = presence_list::table
+            .filter(presence_list::user_id.eq(user_id))
+            .select(presence_list::observed_user_id);
+        profiles::table
+            .filter(profiles::id.eq(any(users)))
+            .get_results(connection)
+            .map_err(ApiError::from)
     }
 }

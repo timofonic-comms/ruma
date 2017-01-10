@@ -113,8 +113,6 @@ CREATE TABLE presence_events (
     event_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     presence TEXT NOT NULL,
-    avatar_url TEXT,
-    displayname TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT now(),
     UNIQUE (ordering)
 );

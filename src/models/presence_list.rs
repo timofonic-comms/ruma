@@ -20,6 +20,7 @@ use ruma_identifiers::UserId;
 use error::ApiError;
 use models::presence_status::PresenceStatus;
 use models::presence_event::PresenceStreamEvent;
+use models::profile::Profile;
 use models::room_membership::RoomMembership;
 use models::user::User;
 use schema::presence_list;
@@ -126,10 +127,15 @@ impl PresenceList {
     ) -> Result<(i64, Vec<PresenceEvent>), ApiError> {
         let mut max_ordering = -1;
 
-        let stream_events= PresenceStreamEvent::find_events_by_uid(
+        let stream_events = PresenceStreamEvent::find_events_by_uid(
             connection,
             user_id,
             since
+        )?;
+
+        let profiles = Profile::find_profiles_by_presence_list(
+            connection,
+            user_id
         )?;
 
         let mut events = Vec::new();
@@ -144,11 +150,19 @@ impl PresenceList {
                 now
             )?;
 
+            let profile: Option<&Profile> = profiles.iter().filter(|profile| profile.id == stream_event.user_id).next();
+            let mut avatar_url = None;
+            let mut displayname = None;
+            if let Some(ref profile) = profile {
+                avatar_url = profile.avatar_url.clone();
+                displayname = profile.displayname.clone();
+            }
+
             events.push(PresenceEvent {
                 content: PresenceEventContent {
-                    avatar_url: stream_event.avatar_url,
+                    avatar_url: avatar_url,
                     currently_active: PresenceState::Online == presence_state,
-                    displayname: stream_event.displayname,
+                    displayname: displayname,
                     last_active_ago: Some(last_active_ago),
                     presence: presence_state,
                     user_id: stream_event.user_id,

@@ -112,7 +112,8 @@ impl PresenceStatus {
         Ok(())
     }
 
-    pub fn update_after_changed_profile(
+    /// Update based on current state.
+    pub fn update_by_uid_and_status(
         connection: &PgConnection,
         homeserver_domain: &str,
         user_id: &UserId
