@@ -163,7 +163,7 @@ impl PresenceStatus {
 }
 
 #[test]
-fn calculate_last_active_ago_work_correctly() {
+fn calculate_time_difference_work_correctly() {
     let now = SystemTime::now();
     assert_eq!(PresenceStatus::calculate_time_difference(now, now).unwrap(), 0);
     let now = SystemTime::now();

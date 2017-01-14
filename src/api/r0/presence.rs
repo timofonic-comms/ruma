@@ -206,15 +206,14 @@ mod tests {
     #[test]
     fn basic_presence_status() {
         let test = Test::new();
-        let access_token = test.create_access_token_with_username("carl");
-        let user_id = "@carl:ruma.test";
+        let alice = test.create_user();
 
-        test.update_presence(&access_token, &user_id, r#"{"presence":"online"}"#);
+        test.update_presence(&alice.token, &alice.id, r#"{"presence":"online"}"#);
 
         let presence_status_path = format!(
             "/_matrix/client/r0/presence/{}/status?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
         let response = test.get(&presence_status_path);
         assert_eq!(response.status, Status::Ok);
@@ -226,15 +225,14 @@ mod tests {
     #[test]
     fn presence_status_message() {
         let test = Test::new();
-        let access_token = test.create_access_token_with_username("carl");
-        let user_id = "@carl:ruma.test";
+        let alice = test.create_user();
 
-        test.update_presence(&access_token, &user_id, r#"{"presence":"online", "status_msg": "Oscar!"}"#);
+        test.update_presence(&alice.token, &alice.id, r#"{"presence":"online", "status_msg": "Oscar!"}"#);
 
         let presence_status_path = format!(
             "/_matrix/client/r0/presence/{}/status?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
         let response = test.get(&presence_status_path);
         assert_eq!(response.status, Status::Ok);
@@ -247,16 +245,15 @@ mod tests {
     #[test]
     fn forbidden_get_presence_status_no_shared_room() {
         let test = Test::new();
-        let alice = test.create_access_token_with_username("alice");
-        let access_token = test.create_access_token_with_username("carl");
-        let user_id = "@carl:ruma.test";
+        let alice = test.create_user();
+        let carl = test.create_user();
 
-        test.update_presence(&access_token, &user_id, r#"{"presence":"online"}"#);
+        test.update_presence(&alice.token, &alice.id, r#"{"presence":"online"}"#);
 
         let presence_status_path = format!(
             "/_matrix/client/r0/presence/{}/status?access_token={}",
-            user_id,
-            alice
+            alice.id,
+            carl.token
         );
         let response = test.get(&presence_status_path);
         assert_eq!(response.status, Status::Forbidden);
@@ -265,13 +262,12 @@ mod tests {
     #[test]
     fn not_found_presence_status() {
         let test = Test::new();
-        let access_token = test.create_access_token_with_username("alice");
-        let user_id = format!("@{}:ruma.test", "alice");
+        let alice = test.create_user();
 
         let presence_status_path = format!(
             "/_matrix/client/r0/presence/{}/status?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
         let response = test.get(&presence_status_path);
         assert_eq!(response.status, Status::NotFound);
@@ -280,14 +276,13 @@ mod tests {
     #[test]
     fn forbidden_put_presence_status() {
         let test = Test::new();
-        let _ = test.create_access_token_with_username("alice");
-        let oscar = test.create_access_token_with_username("oscar");
-        let user_id = "@alice:ruma.test";
+        let alice = test.create_user();
+        let oscar = test.create_user();
 
         let presence_status_path = format!(
             "/_matrix/client/r0/presence/{}/status?access_token={}",
-            user_id,
-            oscar
+            alice.id,
+            oscar.token
         );
         let response = test.put(&presence_status_path, r#"{"presence":"online"}"#);
         assert_eq!(response.status, Status::Forbidden);
@@ -296,41 +291,38 @@ mod tests {
     #[test]
     fn basic_presence_list() {
         let test = Test::new();
-        let bob = test.create_access_token_with_username("bob");
-        let access_token = test.create_access_token_with_username("alice");
-        let (carl, room_id) = test.initial_fixtures("carl", r#"{"visibility": "public"}"#);
-        let user_id = "@alice:ruma.test";
-        let bob_id = "@bob:ruma.test";
-        let carl_id = "@carl:ruma.test";
-        let response = test.join_room(&access_token, &room_id);
+        let (carl, room_id) = test.initial_fixtures(r#"{"visibility": "public"}"#);
+        let alice = test.create_user();
+        let bob = test.create_user();
+        let response = test.join_room(&alice.token, &room_id);
         assert_eq!(response.status, Status::Ok);
-        let response = test.join_room(&bob, &room_id);
+        let response = test.join_room(&bob.token, &room_id);
         assert_eq!(response.status, Status::Ok);
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
-        let response = test.post(&presence_list_path, r#"{"invite":["@bob:ruma.test", "@carl:ruma.test"], "drop": []}"#);
+        let response = test.post(&presence_list_path, &format!(r#"{{"invite":["{}", "{}"], "drop": []}}"#, carl.id, bob.id));
         assert_eq!(response.status, Status::Ok);
 
         let avatar_url_body = r#"{"avatar_url": "mxc://matrix.org/some/url"}"#;
         let avatar_url_path = format!(
             "/_matrix/client/r0/profile/{}/avatar_url?access_token={}",
-            bob_id,
-            bob
+            bob.id,
+            bob.token
         );
         assert!(test.put(&avatar_url_path, avatar_url_body).status.is_success());
 
-        test.update_presence(&bob, &bob_id, r#"{"presence":"online"}"#);
-        test.update_presence(&bob, &bob_id, r#"{"presence":"online"}"#);
-        test.update_presence(&carl, &carl_id, r#"{"presence":"online"}"#);
+        test.update_presence(&bob.token, &bob.id, r#"{"presence":"online"}"#);
+        test.update_presence(&bob.token, &bob.id, r#"{"presence":"online"}"#);
+        test.update_presence(&carl.token, &carl.id, r#"{"presence":"online"}"#);
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
         let response = test.get(&presence_list_path);
         assert_eq!(response.status, Status::Ok);
@@ -341,41 +333,40 @@ mod tests {
 
         assert_eq!(
             events.next().unwrap().find_path(&["content", "user_id"]).unwrap().as_str().unwrap(),
-            bob_id
+            bob.id
         );
 
         assert_eq!(
             events.next().unwrap().find_path(&["content", "user_id"]).unwrap().as_str().unwrap(),
-            carl_id
+            carl.id
         );
     }
 
     #[test]
     fn forbidden_presence_list_no_shared_room() {
         let test = Test::new();
-        let _ = test.create_access_token_with_username("carl");
-        let access_token = test.create_access_token_with_username("alice");
-        let _  = test.create_access_token_with_username("bob");
-        let user_id = "@alice:ruma.test";
+        let alice = test.create_user();
+        let carl = test.create_user();
+        let bob = test.create_user();
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
-        let response = test.post(&presence_list_path, r#"{"invite":["@bob:ruma.test", "@carl:ruma.test"], "drop": []}"#);
+        let response = test.post(&presence_list_path, &format!(r#"{{"invite":["{}", "{}"], "drop": []}}"#, carl.id, bob.id));
         assert_eq!(response.status, Status::Forbidden);
     }
 
     #[test]
     fn invitee_does_not_exist_presence_list() {
         let test = Test::new();
-        let access_token = test.create_access_token_with_username("alice");
+        let alice = test.create_user();
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
-            "@alice:ruma.test",
-            access_token
+            alice.id,
+            alice.token
         );
         let response = test.post(&presence_list_path, r#"{"invite":["@carl:ruma.test"], "drop": []}"#);
         assert_eq!(response.status, Status::UnprocessableEntity);
@@ -384,12 +375,12 @@ mod tests {
     #[test]
     fn to_dropped_does_not_exist_presence_list() {
         let test = Test::new();
-        let access_token = test.create_access_token_with_username("alice");
+        let alice = test.create_user();
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
-            "@alice:ruma.test",
-            access_token
+            alice.id,
+            alice.token
         );
         let response = test.post(&presence_list_path, r#"{"invite":[], "drop": ["@carl:ruma.test"]}"#);
         assert_eq!(response.status, Status::UnprocessableEntity);
@@ -398,28 +389,26 @@ mod tests {
     #[test]
     fn test_drop_presence_list() {
         let test = Test::new();
-        let (access_token, room_id) = test.initial_fixtures("alice", r#"{"visibility": "public"}"#);
-        let bob = test.create_access_token_with_username("bob");
-        let user_id = "@alice:ruma.test";
-        let bob_id = "@bob:ruma.test";
+        let (alice, room_id) = test.initial_fixtures(r#"{"visibility": "public"}"#);
+        let bob = test.create_user();
 
-        let response = test.join_room(&bob, &room_id);
+        let response = test.join_room(&bob.token, &room_id);
         assert_eq!(response.status, Status::Ok);
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
-        let response = test.post(&presence_list_path, r#"{"invite":["@bob:ruma.test"], "drop": []}"#);
+        let response = test.post(&presence_list_path, &format!(r#"{{"invite":["{}"], "drop": []}}"#, bob.id));
         assert_eq!(response.status, Status::Ok);
 
-        test.update_presence(&bob, &bob_id, r#"{"presence":"online"}"#);
+        test.update_presence(&bob.token, &bob.id, r#"{"presence":"online"}"#);
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
         let response = test.get(&presence_list_path);
         assert_eq!(response.status, Status::Ok);
@@ -428,16 +417,16 @@ mod tests {
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
-        let response = test.post(&presence_list_path, r#"{"invite":[], "drop": ["@bob:ruma.test"]}"#);
+        let response = test.post(&presence_list_path, &format!(r#"{{"invite":[], "drop": ["{}"]}}"#, bob.id));
         assert_eq!(response.status, Status::Ok);
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
         let response = test.get(&presence_list_path);
         assert_eq!(response.status, Status::Ok);

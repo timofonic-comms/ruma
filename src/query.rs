@@ -199,9 +199,11 @@ impl Sync {
         set_presence: Option<PresenceState>,
         context: &Context
     ) -> Result<(i64, Vec<PresenceEvent>), ApiError> {
-        if let Some(set_presence) = set_presence {
-            PresenceStatus::upsert(connection, homeserver_domain, &user.id, set_presence, None)?;
-        }
+        let set_presence = match set_presence {
+            Some(set_presence) => set_presence,
+            None => PresenceState::Online,
+        };
+        PresenceStatus::upsert(connection, homeserver_domain, &user.id, set_presence, None)?;
 
         let since = match *context {
             Context::Incremental(batch) | Context::FullState(batch)  => Some(batch.presence_key),

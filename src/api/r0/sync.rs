@@ -340,15 +340,14 @@ mod tests {
     #[test]
     fn set_presence() {
         let test = Test::new();
-        let (access_token, _) = test.initial_fixtures("carl", r#"{"visibility": "public"}"#);
-        let user_id = "@carl:ruma.test";
+        let (alice, _) = test.initial_fixtures(r#"{"visibility": "public"}"#);
 
-        test.update_presence(&access_token, &user_id, r#"{"presence":"offline"}"#);
+        test.update_presence(&alice.token, &alice.id, r#"{"presence":"offline"}"#);
 
         let presence_status_path = format!(
             "/_matrix/client/r0/presence/{}/status?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
         let response = test.get(&presence_status_path);
         assert_eq!(response.status, Status::Ok);
@@ -363,12 +362,12 @@ mod tests {
             set_presence: Some(PresenceState::Online),
             timeout: 0
         };
-        test.sync(&access_token, options);
+        test.sync(&alice.token, options);
 
         let presence_status_path = format!(
             "/_matrix/client/r0/presence/{}/status?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
         let response = test.get(&presence_status_path);
         assert_eq!(response.status, Status::Ok);
@@ -380,27 +379,24 @@ mod tests {
     #[test]
     fn basic_presence_state() {
         let test = Test::new();
-        let (carl, room_id) = test.initial_fixtures("carl", r#"{"visibility": "public"}"#);
-        let access_token = test.create_access_token_with_username("alice");
-        let bob = test.create_access_token_with_username("bob");
-        let user_id = "@alice:ruma.test";
-        let bob_id = "@bob:ruma.test";
-        let carl_id = "@carl:ruma.test";
-        let response = test.join_room(&access_token, &room_id);
+        let (alice, room_id) = test.initial_fixtures(r#"{"visibility": "public"}"#);
+        let carl = test.create_user();
+        let bob = test.create_user();
+        let response = test.join_room(&carl.token, &room_id);
         assert_eq!(response.status, Status::Ok);
-        let response = test.join_room(&bob, &room_id);
+        let response = test.join_room(&bob.token, &room_id);
         assert_eq!(response.status, Status::Ok);
 
         let presence_list_path = format!(
             "/_matrix/client/r0/presence/list/{}?access_token={}",
-            user_id,
-            access_token
+            alice.id,
+            alice.token
         );
-        let response = test.post(&presence_list_path, r#"{"invite":["@bob:ruma.test", "@carl:ruma.test"], "drop": []}"#);
+        let response = test.post(&presence_list_path, &format!(r#"{{"invite":["{}", "{}"], "drop": []}}"#, bob.id, carl.id));
         assert_eq!(response.status, Status::Ok);
 
-        test.update_presence(&bob, &bob_id, r#"{"presence":"online"}"#);
-        test.update_presence(&carl, &carl_id, r#"{"presence":"online"}"#);
+        test.update_presence(&bob.token, &bob.id, r#"{"presence":"online"}"#);
+        test.update_presence(&carl.token, &carl.id, r#"{"presence":"online"}"#);
 
         let options = SyncOptions {
             filter: None,
@@ -409,7 +405,7 @@ mod tests {
             set_presence: None,
             timeout: 0
         };
-        let response = test.sync(&access_token, options);
+        let response = test.sync(&alice.token, options);
         let array = response
             .json()
             .find("presence")
@@ -423,12 +419,12 @@ mod tests {
 
         assert_eq!(
             events.next().unwrap().find_path(&["content", "user_id"]).unwrap().as_str().unwrap(),
-            bob_id
+            bob.id
         );
 
         assert_eq!(
             events.next().unwrap().find_path(&["content", "user_id"]).unwrap().as_str().unwrap(),
-            carl_id
+            carl.id
         );
 
         let next_batch = Test::get_next_batch(&response);
@@ -439,7 +435,7 @@ mod tests {
             set_presence: None,
             timeout: 0
         };
-        let response = test.sync(&access_token, options);
+        let response = test.sync(&alice.token, options);
         let array = response
             .json()
             .find("presence")
