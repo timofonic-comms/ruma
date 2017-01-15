@@ -107,12 +107,3 @@ CREATE TABLE  presence_list (
     observed_user_id TEXT NOT NULL,
     PRIMARY KEY (user_id, observed_user_id)
 );
-
-CREATE TABLE presence_events (
-    ordering BIGSERIAL NOT NULL,
-    event_id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL,
-    presence TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT now(),
-    UNIQUE (ordering)
-);

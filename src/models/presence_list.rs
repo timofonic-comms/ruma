@@ -1,7 +1,6 @@
 //! Storage and querying of presence lists.
 
 use std::cmp;
-use std::time::SystemTime;
 
 use diesel::{
     delete,
@@ -10,16 +9,18 @@ use diesel::{
     ExpressionMethods,
     ExecuteDsl,
     FilterDsl,
+    LoadDsl,
+    SelectDsl,
 };
 use diesel::expression::dsl::any;
 use diesel::pg::PgConnection;
 use ruma_events::EventType;
 use ruma_events::presence::{PresenceEvent, PresenceEventContent, PresenceState};
 use ruma_identifiers::UserId;
+use time;
 
 use error::ApiError;
 use models::presence_status::PresenceStatus;
-use models::presence_event::PresenceStreamEvent;
 use models::profile::Profile;
 use models::room_membership::RoomMembership;
 use models::user::User;
@@ -119,57 +120,66 @@ impl PresenceList {
         }).map_err(ApiError::from)
     }
 
+    /// Get all the `UserId`'s observed by the given `UserId`.
+    pub fn find_observed_users(connection: &PgConnection, user_id: &UserId) -> Result<Vec<UserId>, ApiError> {
+        let users: Vec<UserId> = presence_list::table
+            .filter(presence_list::user_id.eq(user_id))
+            .select(presence_list::observed_user_id)
+            .get_results(connection)
+            .map_err(ApiError::from)?;
+
+        Ok(users)
+    }
+
     /// Return `PresenceEvent`'s for given `UserId`.
     pub fn find_events_by_uid(
         connection: &PgConnection,
         user_id: &UserId,
-        since: Option<i64>
+        since: Option<time::Timespec>
     ) -> Result<(i64, Vec<PresenceEvent>), ApiError> {
         let mut max_ordering = -1;
 
-        let stream_events = PresenceStreamEvent::find_events_by_uid(
-            connection,
-            user_id,
-            since
-        )?;
+        let observed_users = PresenceList::find_observed_users(connection, user_id)?;
+        let users_status = PresenceStatus::get_users(connection, &observed_users, since)?;
 
-        let profiles = Profile::find_profiles_by_presence_list(
-            connection,
-            user_id
-        )?;
+        // FIXME Dont use all the users here. Only the UserId inside `users_status`.
+        let profiles = Profile::get_profiles(connection, &observed_users)?;
 
         let mut events = Vec::new();
-        let now = SystemTime::now();
-        for stream_event in stream_events {
-            max_ordering = cmp::max(stream_event.ordering, max_ordering);
 
-            let presence_state: PresenceState = stream_event.presence.parse()
-                .expect("Database insert should ensure a PresenceState");
-            let last_active_ago = PresenceStatus::calculate_time_difference(
-                stream_event.created_at,
-                now
-            )?;
+        for status in users_status {
+            let last_update = time::Timespec::new(status.updated_at.0, 0);
+            max_ordering = cmp::max(last_update.sec, max_ordering);
 
-            let profile: Option<&Profile> = profiles.iter().filter(|profile| profile.id == stream_event.user_id).next();
+            let presence_state: PresenceState = status.presence.parse().unwrap();
+            let last_active_ago: time::Duration = last_update - time::get_time();
+
+            let profile: Option<&Profile> = profiles.iter()
+                .filter(|profile| profile.id == status.user_id)
+                .next();
+
             let mut avatar_url = None;
             let mut displayname = None;
+
             if let Some(ref profile) = profile {
                 avatar_url = profile.avatar_url.clone();
                 displayname = profile.displayname.clone();
             }
 
-            events.push(PresenceEvent {
+            let event = PresenceEvent {
                 content: PresenceEventContent {
                     avatar_url: avatar_url,
                     currently_active: PresenceState::Online == presence_state,
                     displayname: displayname,
-                    last_active_ago: Some(last_active_ago),
+                    last_active_ago: Some(last_active_ago.num_milliseconds() as u64),
                     presence: presence_state,
-                    user_id: stream_event.user_id,
+                    user_id: status.user_id,
                 },
                 event_type: EventType::Presence,
-                event_id: stream_event.event_id
-            });
+                event_id: status.event_id,
+            };
+
+            events.push(event);
         }
 
         Ok((max_ordering, events))

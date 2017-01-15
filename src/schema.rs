@@ -131,13 +131,3 @@ table! {
         observed_user_id -> Text,
     }
 }
-
-table! {
-    presence_events(event_id) {
-        ordering -> BigSerial,
-        event_id -> Text,
-        user_id -> Text,
-        presence -> Text,
-        created_at -> Timestamp,
-    }
-}

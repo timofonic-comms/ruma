@@ -1,12 +1,11 @@
 //! Endpoints for presence.
 
-use std::time::SystemTime;
-
 use bodyparser;
 use iron::status::Status;
 use iron::{Chain, Handler, IronResult, IronError, Plugin, Request, Response};
 use ruma_identifiers::{UserId};
 use ruma_events::presence::PresenceState;
+use time;
 
 use config::Config;
 use db::DB;
@@ -114,13 +113,15 @@ impl Handler for GetPresenceStatus {
 
         let presence_state: PresenceState = status.presence.parse()
             .expect("Database insert should ensure a PresenceState");
-        let now = SystemTime::now();
-        let last_active_ago = PresenceStatus::calculate_time_difference(status.updated_at, now)?;
+
+        let now = time::get_time();
+        let last_update = time::Timespec::new(status.updated_at.0, 0);
+        let last_active_ago: time::Duration = last_update - now;
 
         let response = GetPresenceStatusResponse {
             status_msg: status.status_msg,
             currently_active: PresenceState::Online == presence_state,
-            last_active_ago: last_active_ago,
+            last_active_ago: last_active_ago.num_milliseconds() as u64,
             presence: presence_state,
         };
 

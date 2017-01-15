@@ -17,6 +17,7 @@ use ruma_events::presence::PresenceState;
 use ruma_events::collections::all::{RoomEvent, StateEvent};
 use ruma_identifiers::RoomId;
 use serde_json::Value;
+use time;
 
 use error::ApiError;
 use models::event::Event;
@@ -206,7 +207,9 @@ impl Sync {
         PresenceStatus::upsert(connection, homeserver_domain, &user.id, set_presence, None)?;
 
         let since = match *context {
-            Context::Incremental(batch) | Context::FullState(batch)  => Some(batch.presence_key),
+            Context::Incremental(batch) | Context::FullState(batch)  => {
+                Some(time::Timespec::new(batch.presence_key, 0))
+            }
             Context::Initial => None,
         };
 

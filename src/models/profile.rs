@@ -8,7 +8,6 @@ use diesel::{
     FindDsl,
     LoadDsl,
     SaveChangesDsl,
-    SelectDsl,
 };
 use diesel::expression::dsl::any;
 use diesel::pg::PgConnection;
@@ -18,7 +17,7 @@ use ruma_identifiers::UserId;
 use error::ApiError;
 use models::room_membership::{RoomMembership, RoomMembershipOptions};
 use models::presence_status::PresenceStatus;
-use schema::{profiles, presence_list};
+use schema::profiles;
 
 /// A Matrix profile.
 #[derive(AsChangeset, Debug, Clone, Identifiable, Insertable, Queryable)]
@@ -149,14 +148,8 @@ impl Profile {
         }
     }
 
-    /// Return `Profile`s for given `UserId` and his `PresenceList` entries.
-    pub fn find_profiles_by_presence_list(
-        connection: &PgConnection,
-        user_id: &UserId,
-    ) -> Result<Vec<Profile>, ApiError> {
-        let users = presence_list::table
-            .filter(presence_list::user_id.eq(user_id))
-            .select(presence_list::observed_user_id);
+    /// Return `Profile`s for a list of `UserId`'s.
+    pub fn get_profiles(connection: &PgConnection, users: &Vec<UserId>) -> Result<Vec<Profile>, ApiError> {
         profiles::table
             .filter(profiles::id.eq(any(users)))
             .get_results(connection)

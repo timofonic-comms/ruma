@@ -1,24 +1,24 @@
 //! Storage and querying of presence status.
 
-#[cfg(test)]
-use std::time::Duration;
-use std::time::SystemTime;
-
 use diesel::{
     insert,
     Connection,
     ExecuteDsl,
+    ExpressionMethods,
     FindDsl,
+    FilterDsl,
     LoadDsl,
     SaveChangesDsl,
 };
-use diesel::result::Error as DieselError;
+use diesel::expression::dsl::any;
 use diesel::pg::PgConnection;
+use diesel::pg::data_types::PgTimestamp;
+use diesel::result::Error as DieselError;
 use ruma_events::presence::PresenceState;
 use ruma_identifiers::{UserId, EventId};
+use time;
 
 use error::ApiError;
-use models::presence_event::PresenceStreamEvent;
 use schema::presence_status;
 
 /// A Matrix presence status, not saved yet.
@@ -49,7 +49,7 @@ pub struct PresenceStatus {
     /// A possible status message from the user.
     pub status_msg: Option<String>,
     /// Timestamp of the last update.
-    pub updated_at: SystemTime,
+    pub updated_at: PgTimestamp,
 }
 
 impl PresenceStatus {
@@ -62,9 +62,10 @@ impl PresenceStatus {
         status_msg: Option<String>
     ) -> Result<(), ApiError> {
         let event_id = &EventId::new(&homeserver_domain).map_err(ApiError::from)?;
+
         connection.transaction::<(), ApiError, _>(|| {
             let status = PresenceStatus::find_by_uid(connection, user_id)?;
-            PresenceStreamEvent::insert(connection, event_id, user_id, presence)?;
+
             match status {
                 Some(mut status) => status.update(connection, presence, status_msg, event_id),
                 None => PresenceStatus::create(connection, user_id, presence, status_msg, event_id),
@@ -83,7 +84,9 @@ impl PresenceStatus {
         self.presence = presence.to_string();
         self.status_msg = status_msg;
         self.event_id = event_id.clone();
-        self.updated_at = SystemTime::now();
+
+        // Use seconds instead of microseconds (default for PgTimestamp)
+        self.updated_at = PgTimestamp(time::get_time().sec);
 
         match self.save_changes::<PresenceStatus>(connection) {
             Ok(_) => Ok(()),
@@ -153,20 +156,29 @@ impl PresenceStatus {
         }
     }
 
-    /// Calculate the difference between two SystemTimes in milliseconds.
-    pub fn calculate_time_difference(since: SystemTime, now: SystemTime) -> Result<u64, ApiError> {
-        let elapsed = now.duration_since(since).map_err(ApiError::from)?;
-        let mut millis = elapsed.as_secs() * 1_000;
-        millis += (elapsed.subsec_nanos() / 1_000_000) as u64;
-        Ok(millis)
-    }
-}
+    /// Get status entries for a list of `UserId`'s which were updated after a
+    /// specific point in time.
+    pub fn get_users(
+        connection: &PgConnection,
+        users: &Vec<UserId>,
+        since: Option<time::Timespec>,
+    ) -> Result<Vec<PresenceStatus>, ApiError> {
+        match since {
+            Some(since) => {
+                let time = PgTimestamp(since.sec);
 
-#[test]
-fn calculate_time_difference_work_correctly() {
-    let now = SystemTime::now();
-    assert_eq!(PresenceStatus::calculate_time_difference(now, now).unwrap(), 0);
-    let now = SystemTime::now();
-    let added = now + Duration::from_millis(1500);
-    assert_eq!(PresenceStatus::calculate_time_difference(now, added).unwrap(), 1500);
+                presence_status::table
+                    .filter(presence_status::user_id.eq(any(users)))
+                    .filter(presence_status::updated_at.gt(time))
+                    .get_results(connection)
+                    .map_err(ApiError::from)
+            },
+            None => {
+                presence_status::table
+                    .filter(presence_status::user_id.eq(any(users)))
+                    .get_results(connection)
+                    .map_err(ApiError::from)
+            }
+        }
+    }
 }
