@@ -24,7 +24,15 @@ pub use self::path_params::{
 /// `middleware_chain!(JoinRoom, []);`
 #[macro_export]
 macro_rules! middleware_chain {
-    ($chain:ident) => {chain_impl!($chain, []);};
+    ($chain:ident) => {
+        impl MiddlewareChain for $chain {
+            /// Create a `$chain` without any middleware.
+            fn chain() -> Chain {
+                Chain::new($chain)
+            }
+        }
+    };
+
     ($chain:ident, [$($middleware:expr),*]) => {
         impl MiddlewareChain for $chain {
             /// Create a `$chain` with all necessary middleware.

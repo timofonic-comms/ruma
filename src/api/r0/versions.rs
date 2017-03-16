@@ -1,19 +1,25 @@
 //! Endpoints for information about supported versions of the Matrix spec.
 
-use iron::{Handler, IronResult, Request, Response, status};
+use iron::{Chain, Handler, IronResult, Request, Response, status};
 
+use middleware::MiddlewareChain;
 use modifier::SerializableResponse;
 
-/// The /versions endpoint.
+/// The `/versions` endpoint.
+pub struct Versions;
+
+/// Endpoint's response.
 #[derive(Serialize)]
-pub struct Versions {
+struct VersionsResponse {
     versions: Vec<&'static str>,
 }
 
-impl Versions {
+middleware_chain!(Versions);
+
+impl VersionsResponse {
     /// Returns the list of supported `Versions` of the Matrix spec.
     pub fn supported() -> Self {
-        Versions {
+        VersionsResponse {
             versions: vec![
                 "r0.2.0"
             ]
@@ -23,6 +29,6 @@ impl Versions {
 
 impl Handler for Versions {
     fn handle(&self, _request: &mut Request) -> IronResult<Response> {
-        Ok(Response::with((status::Ok, SerializableResponse(&self))))
+        Ok(Response::with((status::Ok, SerializableResponse(VersionsResponse::supported()))))
     }
 }
