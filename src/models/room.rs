@@ -126,7 +126,7 @@ impl Room {
             let new_create_event: NewEvent = CreateEvent {
                 content: CreateEventContent {
                     creator: new_room.user_id.clone(),
-                    federate: creation_options.federate,
+                    federate: Some(creation_options.federate),
                 },
                 event_id: EventId::new(homeserver_domain)?,
                 event_type: EventType::RoomCreate,
