@@ -184,7 +184,7 @@ impl<'a> Server<'a> {
     pub fn run(self) -> HttpResult<Listening> {
         let address = format!("{}:{}", self.config.bind_address, self.config.bind_port);
 
-        info!("Starting Ruma server on {}.", address);
+        warn!("Starting Ruma server on {}.", address);
 
         let iron = Iron::new(self.mount);
 
