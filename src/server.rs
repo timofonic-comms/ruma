@@ -18,6 +18,7 @@ use api::r0::{
     GetAvatarUrl,
     GetDisplayName,
     GetFilter,
+    GetLoginFlows,
     GetPresenceList,
     GetPresenceStatus,
     GetPushers,
@@ -88,6 +89,7 @@ impl<'a> Server<'a> {
             "delete_room_alias",
         );
         r0_router.put("/directory/room/:room_alias", PutRoomAlias::chain(), "put_room_alias");
+        r0_router.get("/login", GetLoginFlows::chain(), "login_flows");
         r0_router.post("/login", Login::chain(), "login");
         r0_router.post("/logout", Logout::chain(), "logout");
         r0_router.post("/register", Register::chain(), "register");

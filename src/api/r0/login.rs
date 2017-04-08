@@ -113,6 +113,36 @@ impl Handler for Login {
     }
 }
 
+/// Login Flows
+pub struct GetLoginFlows;
+
+#[derive(Debug, Serialize)]
+struct Flows {
+    pub flows: Vec<LoginFlowType>
+}
+
+#[derive(Debug, Serialize)]
+struct LoginFlowType {
+    #[serde(rename="type")]
+    pub login_type: String
+}
+
+impl MiddlewareChain for GetLoginFlows {
+    fn chain() -> Chain {
+        Chain::new(GetLoginFlows)
+    }
+}
+
+impl Handler for GetLoginFlows {
+    fn handle(&self, _: &mut Request) -> IronResult<Response> {
+        let pass_login = LoginFlowType { login_type: "m.login.password".to_string() };
+        let response = Flows { flows: vec![pass_login] };
+
+        Ok(Response::with((status::Ok, SerializableResponse(response))))
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use test::Test;
