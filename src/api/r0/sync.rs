@@ -2,6 +2,8 @@
 use std::u64;
 use std::error::Error;
 use std::str::FromStr;
+use std::thread;
+use std::time;
 
 use iron::{Chain, Handler, IronResult, Request, Response};
 use iron::status::Status;
@@ -40,10 +42,10 @@ impl Handler for Sync {
         let mut timeout = 0;
         for tuple in query_pairs {
             match (tuple.0.as_ref(), tuple.1.as_ref()) {
-                ("filter", value) => {
-                    let content = from_str(value)
-                        .map_err(|err| ApiError::invalid_param("filter", err.description()))?;
-                    filter = Some(content);
+                ("filter", _) => {
+                    // let content = from_str(value)
+                    //     .map_err(|err| ApiError::invalid_param("filter", err.description()))?;
+                    filter = None
                 },
                 ("since", value) => {
                     let batch = Batch::from_str(value)
@@ -87,6 +89,9 @@ impl Handler for Sync {
         };
 
         let response = query::Sync::sync(&connection, &config.domain, &user, options)?;
+
+        let time = time::Duration::from_millis(3000);
+        thread::sleep(time);
 
         Ok(Response::with((Status::Ok, SerializableResponse(response))))
     }

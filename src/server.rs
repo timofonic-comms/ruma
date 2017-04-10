@@ -22,6 +22,7 @@ use api::r0::{
     GetPresenceList,
     GetPresenceStatus,
     GetPushers,
+    GetPushRules,
     GetRoomAlias,
     GetTags,
     InviteToRoom,
@@ -143,6 +144,7 @@ impl<'a> Server<'a> {
         r0_router.post("/presence/list/:user_id", PostPresenceList::chain(), "post_presence_list");
         r0_router.get("/pushers", GetPushers::chain(), "pushers");
         r0_router.post("/pushers/set", SetPushers::chain(), "set_pushers");
+        r0_router.get("/pushrules/", GetPushRules::chain(), "get_push_rules");
 
         let mut r0 = Chain::new(r0_router);
 

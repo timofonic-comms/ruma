@@ -284,7 +284,8 @@ impl Room {
                             new_events.push(new_canonical_alias_event);
                         },
                         StrippedState::RoomGuestAccess(_) => {
-                            Err(ApiError::unimplemented("Guests are not yet supported".to_string()))?
+                            // skip for now
+                            // Err(ApiError::unimplemented("Guests are not yet supported".to_string()))?
                         },
                         StrippedState::RoomHistoryVisibility(event) => {
                             is_history_visibility_set = true;
