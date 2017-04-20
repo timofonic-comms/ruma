@@ -2,12 +2,14 @@
 use diesel::migrations::setup_database;
 use diesel::pg::PgConnection;
 use iron::{Chain, Iron, IronError, IronResult, Listening, Request, Response};
+use iron::status::Status;
 use iron::error::HttpResult;
 use mount::Mount;
 use persistent::{Read, Write};
 use r2d2::Config as R2D2Config;
 use r2d2_diesel::Error as R2D2DieselError;
 use router::Router;
+use modifier::SerializableResponse;
 
 use api::r0::{
     AccountPassword,
@@ -145,6 +147,7 @@ impl<'a> Server<'a> {
         r0_router.get("/pushers", GetPushers::chain(), "pushers");
         r0_router.post("/pushers/set", SetPushers::chain(), "set_pushers");
         r0_router.get("/pushrules/", GetPushRules::chain(), "get_push_rules");
+        r0_router.get("/account/3pid", thrird_party, "third_party_account");
 
         let mut r0 = Chain::new(r0_router);
 
@@ -203,4 +206,19 @@ impl<'a> Server<'a> {
 
 fn deprecated(_: &mut Request) -> IronResult<Response> {
     Err(IronError::from(ApiError::unauthorized("tokenrefresh is no longer supported".to_string())))
+}
+
+#[derive(Debug, Clone, Serialize)]
+// Third party ID response
+pub struct ThirdPartyIDResponse {
+    // Third party ids
+    pub threepids: Vec<String>,
+}
+
+fn thrird_party(_: &mut Request) -> IronResult<Response> {
+    let res = ThirdPartyIDResponse {
+        threepids: vec![]
+    };
+
+    Ok(Response::with((Status::Ok, SerializableResponse(res))))
 }
