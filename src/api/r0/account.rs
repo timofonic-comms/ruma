@@ -56,7 +56,7 @@ impl Handler for AccountPassword {
         user.save_changes::<User>(&*connection)
             .map_err(|_| ApiError::unauthorized(None))?;
 
-        Ok(Response::with(Status::Ok))
+        Ok(Response::with((Status::Ok, "{}")))
     }
 }
 
@@ -86,7 +86,7 @@ impl Handler for DeactivateAccount {
         AccountData::delete_by_uid(&connection, &user.id)?;
         RoomAccountData::delete_by_uid(&connection, &user.id)?;
 
-        Ok(Response::with(Status::Ok))
+        Ok(Response::with((Status::Ok, "{}")))
     }
 }
 
@@ -130,7 +130,7 @@ impl Handler for PutAccountData {
 
         AccountData::upsert(&connection, &new_data)?;
 
-        Ok(Response::with(Status::Ok))
+        Ok(Response::with((Status::Ok, "{}")))
     }
 }
 
@@ -195,7 +195,7 @@ impl Handler for PutRoomAccountData {
 
         RoomAccountData::upsert(&connection, &new_data)?;
 
-        Ok(Response::with(Status::Ok))
+        Ok(Response::with((Status::Ok, "{}")))
     }
 }
 

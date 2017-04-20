@@ -8,7 +8,6 @@ use std::time;
 use iron::{Chain, Handler, IronResult, Request, Response};
 use iron::status::Status;
 use ruma_events::presence::PresenceState;
-use serde_json::from_str;
 use url::Url;
 
 use config::Config;

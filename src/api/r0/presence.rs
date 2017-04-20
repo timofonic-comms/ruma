@@ -60,7 +60,7 @@ impl Handler for PutPresenceStatus {
             put_presence_status_request.status_msg
         )?;
 
-        Ok(Response::with(Status::Ok))
+        Ok(Response::with((Status::Ok, "{}")))
     }
 }
 
@@ -172,7 +172,7 @@ impl Handler for PostPresenceList {
             put_presence_list_request.drop
         )?;
 
-        Ok(Response::with(Status::Ok))
+        Ok(Response::with((Status::Ok, "{}")))
     }
 }
 
