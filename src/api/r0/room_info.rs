@@ -157,8 +157,8 @@ mod tests {
                     );
 
                     assert_eq!(
-                        e.pointer("/content/federate").unwrap().as_bool().unwrap(),
-                        true
+                        e.pointer("/content/m.federate").unwrap().as_bool().unwrap(),
+                        false
                     );
                 },
                 "m.room.history_visibility" => {

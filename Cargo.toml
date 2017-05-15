@@ -27,7 +27,6 @@ r2d2 = "0.7.2"
 r2d2-diesel = "0.12.0"
 rand = "0.3.15"
 router = "0.5.1"
-ruma-events = "0.8.0"
 serde = "1.0.0"
 serde_derive = "1.0.0"
 serde_json = "1.0.0"
@@ -35,6 +34,10 @@ serde_yaml = "0.7.0"
 toml = "0.4.0"
 unicase = "1.4.0"
 url = "1.4.0"
+
+[dependencies.ruma-events]
+git = "https://github.com/mujx/ruma-events"
+branch = "matrix-events-update"
 
 [dependencies.diesel]
 features = ["postgres"]

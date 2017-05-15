@@ -2,6 +2,7 @@
 
 use std::convert::{TryInto, TryFrom};
 
+use chrono::{UTC, Timelike};
 use diesel::{
     ExpressionMethods,
     FilterDsl,
@@ -14,7 +15,6 @@ use diesel::{
 };
 use diesel::expression::dsl::{any, max};
 use diesel::result::Error as DieselError;
-use diesel::pg::data_types::PgTimestamp;
 use diesel::pg::PgConnection;
 use ruma_events::{
     CustomRoomEvent,
@@ -92,10 +92,10 @@ pub struct NewEvent {
     pub content: String,
     /// The room the event was sent in.
     pub room_id: RoomId,
+    /// The user who sent the event.
+    pub sender: UserId,
     /// An event subtype that determines whether or not the event will overwrite a previous one.
     pub state_key: Option<String>,
-    /// The user who sent the event.
-    pub user_id: UserId,
 }
 
 /// A Matrix event.
@@ -108,7 +108,7 @@ pub struct Event {
     /// The room the event was sent in.
     pub room_id: RoomId,
     /// The user who sent the event.
-    pub user_id: UserId,
+    pub sender: UserId,
     /// The type of the event, e.g. *m.room.create*.
     pub event_type: String,
     /// An event subtype that determines whether or not the event will overwrite a previous one.
@@ -118,7 +118,7 @@ pub struct Event {
     /// Extra key-value pairs to be mixed into the top-level JSON representation of the event.
     pub extra_content: Option<String>,
     /// The time the event was created.
-    pub created_at: PgTimestamp,
+    pub origin_server_ts: i64,
 }
 
 impl Event {
@@ -229,6 +229,16 @@ impl Event {
             .get_results(connection)
             .map_err(ApiError::from)
     }
+
+    /// Return the current UNIX time in milliseconds. Used to populate the `origin_server_ts` field.
+    pub fn unix_time_in_millis() -> u64 {
+        let datetime = UTC::now();
+
+        let t1 = (datetime.timestamp() as u64) * 1_000 as u64;
+        let t2 = (datetime.nanosecond() / 1_000_000) as u64;
+
+        (t1 + t2) as u64
+    }
 }
 
 
@@ -244,8 +254,8 @@ macro_rules! impl_try_from_room_event_for_new_event {
                     extra_content: None,
                     id: event.event_id().clone(),
                     room_id: event.room_id().clone(),
+                    sender: event.sender().clone(),
                     state_key: None,
-                    user_id: event.user_id().clone(),
                 })
             }
         }
@@ -261,7 +271,7 @@ macro_rules! impl_try_from_state_event_for_new_event {
                 Ok(NewEvent {
                     content: to_string(event.content()).map_err(ApiError::from)?,
                     event_type: event.event_type().to_string(),
-                    extra_content: match event.extra_content() {
+                    extra_content: match event.unsigned() {
                         Some(extra_content) => Some(
                             to_string(&extra_content).map_err(ApiError::from)?
                         ),
@@ -269,8 +279,8 @@ macro_rules! impl_try_from_state_event_for_new_event {
                     },
                     id: event.event_id().clone(),
                     room_id: event.room_id().clone(),
+                    sender: event.sender().clone(),
                     state_key: Some(event.state_key().to_string()),
-                    user_id: event.user_id().clone(),
                 })
             }
         }
@@ -287,9 +297,10 @@ macro_rules! impl_try_into_room_event_for_event {
                     content: from_str(&self.content).map_err(ApiError::from)?,
                     event_id: self.id,
                     event_type: EventType::from(self.event_type.as_ref()),
+                    origin_server_ts: self.origin_server_ts as u64,
                     room_id: self.room_id,
+                    sender: self.sender,
                     unsigned: None,
-                    user_id: self.user_id,
                 })
             }
         }
@@ -308,9 +319,10 @@ macro_rules! impl_try_into_state_event_for_event {
                     event_id: self.id,
                     state_key: "".to_string(),
                     event_type: EventType::from(self.event_type.as_ref()),
+                    origin_server_ts: self.origin_server_ts as u64,
                     room_id: self.room_id,
+                    sender: self.sender,
                     unsigned: None,
-                    user_id: self.user_id,
                 })
             }
         }
@@ -407,12 +419,13 @@ impl TryInto<MemberEvent> for Event {
                 },
                 None => None,
             },
+            origin_server_ts: self.origin_server_ts as u64,
             prev_content: None,
             state_key: "".to_string(),
             event_type: EventType::RoomMember,
             room_id: self.room_id,
+            sender: self.sender,
             unsigned: None,
-            user_id: self.user_id,
         })
     }
 }

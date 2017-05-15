@@ -292,15 +292,17 @@ impl RoomMembership {
                 displayname: displayname,
                 membership: membership,
                 third_party_invite: None,
+                is_direct: None,
             },
             event_id: event_id.clone(),
             event_type: EventType::RoomMember,
             invite_room_state: None,
+            origin_server_ts: Event::unix_time_in_millis(),
             prev_content: None,
             room_id: options.room_id.clone(),
+            sender: options.user_id.clone(),
             state_key: format!("@{}:{}", options.user_id.clone(), &homeserver_domain),
             unsigned: None,
-            user_id: options.user_id.clone(),
         }.try_into()?;
 
         Ok(new_member_event)

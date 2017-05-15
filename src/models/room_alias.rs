@@ -20,7 +20,7 @@ use ruma_events::room::aliases::{AliasesEvent, AliasesEventContent};
 use ruma_events::EventType;
 
 use error::ApiError;
-use models::event::NewEvent;
+use models::event::{Event, NewEvent};
 use models::room::Room;
 use schema::{events, room_aliases};
 
@@ -72,11 +72,12 @@ impl RoomAlias {
                 content: AliasesEventContent { aliases: ids },
                 event_id: EventId::new(homeserver_domain)?,
                 event_type: EventType::RoomAliases,
+                origin_server_ts: Event::unix_time_in_millis(),
                 prev_content: None,
                 room_id: new_room_alias.room_id.clone(),
+                sender: new_room_alias.user_id.clone(),
                 state_key: homeserver_domain.to_string(),
                 unsigned: None,
-                user_id: new_room_alias.user_id.clone(),
             }.try_into()?;
 
             insert(&new_room_alias_event)

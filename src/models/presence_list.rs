@@ -173,7 +173,7 @@ impl PresenceList {
             let event = PresenceEvent {
                 content: PresenceEventContent {
                     avatar_url: avatar_url,
-                    currently_active: PresenceState::Online == presence_state,
+                    currently_active: Some(PresenceState::Online == presence_state),
                     displayname: displayname,
                     last_active_ago: Some(last_active_ago as u64),
                     presence: presence_state,

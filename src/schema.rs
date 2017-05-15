@@ -29,12 +29,12 @@ table! {
         id -> Text,
         ordering -> BigSerial,
         room_id -> Text,
-        user_id -> Text,
+        sender -> Text,
         event_type -> Text,
         state_key -> Nullable<Text>,
         content -> Text,
         extra_content -> Nullable<Text>,
-        created_at -> Timestamp,
+        origin_server_ts -> BigSerial,
     }
 }
 
