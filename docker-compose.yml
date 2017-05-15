@@ -3,7 +3,14 @@ services:
   rust:
     image: "rumaio/ruma-dev@sha256:cbaa914352becdb4d554b5673c1ccec739e2d51374e94f4c092dbde29eb004a4"
     links:
-      - "postgres"
+        - "postgres"
+    ports:
+        - "3000:3000"
+    command: "cargo run -- run"
+    environment:
+        - "RUST_LOG=warn"
+    depends_on:
+        - "postgres"
     volumes:
       - ".:/source"
       - "cargo_git:/root/.cargo/git"
@@ -11,7 +18,9 @@ services:
   postgres:
     image: "postgres"
     environment:
-      - "POSTGRES_PASSWORD=test"
+      - "POSTGRES_USER=postgres"
+      - "POSTGRES_PASS=postgres"
+      - "POSTGRES_DB=ruma"
 volumes:
   cargo_git: {}
   cargo_registry: {}
