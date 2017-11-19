@@ -189,7 +189,7 @@ impl<'a> Server<'a> {
 
         let mut versions_router = Router::new();
 
-        versions_router.get("/versions", Versions::supported(), "versions");
+        versions_router.get("/versions", Versions::chain(), "versions");
 
         let mut versions = Chain::new(versions_router);
         versions.link_after(ResponseHeaders);
